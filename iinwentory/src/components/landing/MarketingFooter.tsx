@@ -52,9 +52,9 @@ export default function MarketingFooter() {
             <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Company</h3>
             <ul className="mt-4 space-y-3">
               <li><a href="#features" className="text-sm text-gray-300 hover:text-white transition-colors">About</a></li>
-              <li><a href="#faq" className="text-sm text-gray-300 hover:text-white transition-colors">FAQ</a></li>
               <li><a href="mailto:support@iinwentory.com" className="text-sm text-gray-300 hover:text-white transition-colors">Support</a></li>
-              <li><a href="mailto:sales@iinwentory.com" className="text-sm text-gray-300 hover:text-white transition-colors">Contact Sales</a></li>
+              <li><Link to="/privacy" className="text-sm text-gray-300 hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="text-sm text-gray-300 hover:text-white transition-colors">Terms of Service</Link></li>
             </ul>
           </div>
         </div>

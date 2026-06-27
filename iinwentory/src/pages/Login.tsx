@@ -423,8 +423,9 @@ export default function Login() {
 
           {mode === 'register' && !forgotSent && !resetSucceeded && (
             <p className="auth-fineprint">
-              By creating an account you agree to our Terms of Service and{' '}
-              <a href="https://iinwentory.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+              By creating an account you agree to our{' '}
+              <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> and{' '}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
             </p>
           )}
         </div>

@@ -17,6 +17,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 // Each route becomes its own JS chunk fetched on demand. Login stays eager
 // because it's the first paint for unauthenticated visitors.
 const Landing = lazy(() => import('./pages/Landing'));
+const Terms = lazy(() => import('./pages/legal/Terms'));
+const Privacy = lazy(() => import('./pages/legal/Privacy'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Items = lazy(() => import('./pages/Items'));
@@ -45,6 +47,9 @@ function App() {
                 <Routes>
                   {/* Public marketing landing page (ported from the old Nuxt site) */}
                   <Route path="/" element={<Landing />} />
+                  {/* Public legal pages — linked from the footer and sign-up form */}
+                  <Route path="/terms" element={<Terms />} />
+                  <Route path="/privacy" element={<Privacy />} />
                   <Route path="/login" element={<Login />} />
                   {/* Marketing site CTAs link to /?register=1&plan=xxx */}
                   <Route path="/register" element={<Login />} />
