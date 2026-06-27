@@ -43,13 +43,6 @@ function frontendUrl(): string {
   return (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim();
 }
 
-// Publicly reachable logo for the email header. Email clients can't load
-// localhost or SVG, so this defaults to the production PNG served from the
-// marketing site's /public folder. Override with EMAIL_LOGO_URL if needed.
-function logoUrl(): string {
-  return process.env.EMAIL_LOGO_URL || 'https://iinwentory.com/email-logo.png';
-}
-
 // Shared branded shell so every email looks consistent. `cta` renders a button.
 function renderLayout(opts: {
   heading: string;
@@ -60,7 +53,6 @@ function renderLayout(opts: {
   const { heading, bodyHtml, cta, footnote } = opts;
   return `
     <div style="font-family: Inter, -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 0;">
-      <img src="${logoUrl()}" alt="iinwentory" width="44" height="42" style="display:block; border:0; outline:none; text-decoration:none; margin-bottom: 24px;" />
       <h2 style="color: #294EA7; margin-bottom: 16px;">${heading}</h2>
       <div style="color: #475569; line-height: 1.6; font-size: 15px;">${bodyHtml}</div>
       ${cta
