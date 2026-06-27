@@ -1,5 +1,44 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCtaLinks } from './links';
+
+/**
+ * Footer link to a section on the landing page. The footer also renders on
+ * /terms and /privacy, where these sections don't exist — so when we're not on
+ * the landing page we navigate there first, then scroll once the (lazy-loaded)
+ * section has mounted.
+ */
+function SectionLink({ id, children }: { id: string; children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  const scrollToSection = (attempts = 0) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    } else if (attempts < 40) {
+      // Landing is lazy-loaded; poll briefly until its sections exist.
+      setTimeout(() => scrollToSection(attempts + 1), 50);
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    // Let modified clicks (new tab, etc.) use the href fallback.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    if (pathname !== '/') navigate('/');
+    scrollToSection();
+  };
+
+  return (
+    <a
+      href={`/#${id}`}
+      onClick={handleClick}
+      className="text-sm text-gray-300 hover:text-white transition-colors"
+    >
+      {children}
+    </a>
+  );
+}
 
 export default function MarketingFooter() {
   const year = new Date().getFullYear();
@@ -29,10 +68,10 @@ export default function MarketingFooter() {
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Product</h3>
             <ul className="mt-4 space-y-3">
-              <li><a href="#features" className="text-sm text-gray-300 hover:text-white transition-colors">Features</a></li>
-              <li><a href="#pricing" className="text-sm text-gray-300 hover:text-white transition-colors">Pricing</a></li>
-              <li><a href="#how-it-works" className="text-sm text-gray-300 hover:text-white transition-colors">How It Works</a></li>
-              <li><a href="#faq" className="text-sm text-gray-300 hover:text-white transition-colors">FAQ</a></li>
+              <li><SectionLink id="features">Features</SectionLink></li>
+              <li><SectionLink id="pricing">Pricing</SectionLink></li>
+              <li><SectionLink id="how-it-works">How It Works</SectionLink></li>
+              <li><SectionLink id="faq">FAQ</SectionLink></li>
             </ul>
           </div>
 
@@ -40,10 +79,10 @@ export default function MarketingFooter() {
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Solutions</h3>
             <ul className="mt-4 space-y-3">
-              <li><a href="#features" className="text-sm text-gray-300 hover:text-white transition-colors">Small Business</a></li>
-              <li><a href="#features" className="text-sm text-gray-300 hover:text-white transition-colors">Enterprise</a></li>
-              <li><a href="#features" className="text-sm text-gray-300 hover:text-white transition-colors">Warehousing</a></li>
-              <li><a href="#features" className="text-sm text-gray-300 hover:text-white transition-colors">Retail</a></li>
+              <li><SectionLink id="features">Small Business</SectionLink></li>
+              <li><SectionLink id="features">Enterprise</SectionLink></li>
+              <li><SectionLink id="features">Warehousing</SectionLink></li>
+              <li><SectionLink id="features">Retail</SectionLink></li>
             </ul>
           </div>
 
@@ -51,7 +90,7 @@ export default function MarketingFooter() {
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Company</h3>
             <ul className="mt-4 space-y-3">
-              <li><a href="#features" className="text-sm text-gray-300 hover:text-white transition-colors">About</a></li>
+              <li><SectionLink id="features">About</SectionLink></li>
               <li><a href="mailto:support@iinwentory.com" className="text-sm text-gray-300 hover:text-white transition-colors">Support</a></li>
               <li><Link to="/privacy" className="text-sm text-gray-300 hover:text-white transition-colors">Privacy Policy</Link></li>
               <li><Link to="/terms" className="text-sm text-gray-300 hover:text-white transition-colors">Terms of Service</Link></li>
