@@ -6,12 +6,32 @@
     <link rel="apple-touch-icon" href="/imperial-trends-logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="iinwentory - Smart inventory management. Track items, folders, quantities, values, and generate QR codes for your products." />
+    <meta name="theme-color" content="#3461CD" />
     <title>iinwentory — Inventory Management</title>
 
+    <!-- Canonical + crawl directives for the public marketing landing page at /. -->
+    <link rel="canonical" href="https://iinwentory.com/" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph (Facebook / LinkedIn / Slack link previews) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="iinwentory" />
+    <meta property="og:url" content="https://iinwentory.com/" />
+    <meta property="og:title" content="iinwentory — Smart Inventory Management" />
+    <meta property="og:description" content="Track items, folders, quantities, and values. Generate QR codes and manage your inventory from anywhere." />
+    <meta property="og:image" content="https://iinwentory.com/imperial-trends-logo.png" />
+
+    <!-- Twitter / X card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="iinwentory — Smart Inventory Management" />
+    <meta name="twitter:description" content="Track items, folders, quantities, and values. Generate QR codes and manage your inventory from anywhere." />
+    <meta name="twitter:image" content="https://iinwentory.com/imperial-trends-logo.png" />
+
     <!-- Preconnect to the API origin so the first auth/me + bootstrap
-         requests don't pay the TLS handshake cost on top of cold start. -->
-    <link rel="preconnect" href="https://api.iinwentory.com" crossorigin />
-    <link rel="dns-prefetch" href="https://api.iinwentory.com" />
+         requests don't pay the TLS handshake cost on top of cold start.
+         NOTE: keep this host in sync with VITE_API_URL in .env. -->
+    <link rel="preconnect" href="https://server-pi-five-91.vercel.app" crossorigin />
+    <link rel="dns-prefetch" href="https://server-pi-five-91.vercel.app" />
 
     <!-- Inline pre-React paint so users see a coloured shell within ~50ms
          instead of a blank white screen until the JS bundle parses. -->

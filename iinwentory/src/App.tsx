@@ -16,6 +16,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 // Lazy-load every non-auth page so the initial bundle is dramatically smaller.
 // Each route becomes its own JS chunk fetched on demand. Login stays eager
 // because it's the first paint for unauthenticated visitors.
+const Landing = lazy(() => import('./pages/Landing'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Items = lazy(() => import('./pages/Items'));
@@ -42,6 +43,8 @@ function App() {
                 <WorkflowProvider>
                 <Suspense fallback={<LoadingShell />}>
                 <Routes>
+                  {/* Public marketing landing page (ported from the old Nuxt site) */}
+                  <Route path="/" element={<Landing />} />
                   <Route path="/login" element={<Login />} />
                   {/* Marketing site CTAs link to /?register=1&plan=xxx */}
                   <Route path="/register" element={<Login />} />

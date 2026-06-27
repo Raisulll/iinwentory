@@ -1,0 +1,189 @@
+/* ════════════════════════════════════════════════════════════
+   Landing page styles — ported from the (Nuxt/Vue) marketing site.
+   Everything is scoped under `.landing-page` so it never leaks into
+   the authenticated app. Delete this file + the landing components
+   to remove the landing page entirely.
+   ════════════════════════════════════════════════════════════ */
+
+.landing-page {
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  background: #F4F5F1;
+  color: #111827;
+  -webkit-font-smoothing: antialiased;
+}
+
+.landing-page img,
+.landing-page svg {
+  max-width: 100%;
+}
+
+/* ──────────  Undo the app's global element resets inside the landing page  ──────────
+   The app's index.css sets h1–h4 sizes/colours, `a { color: inherit }`,
+   `button { background: transparent }` etc. as UNLAYERED rules. In Tailwind v4
+   unlayered rules beat every (layered) utility class — so `text-7xl`,
+   `text-white`, link colours and button backgrounds were all being clobbered.
+   `revert-layer` defers these properties back to the Tailwind utility layer so
+   the landing page's utility classes take effect again. Scoped to .landing-page
+   so the rest of the app is untouched.                                          */
+/* The app's `* { margin:0; padding:0 }` (unlayered) was killing every Tailwind
+   spacing utility on the landing page. Revert to the utility layer so p-*, m-*,
+   pt-*, etc. work again; elements with no spacing utility fall back to 0. */
+.landing-page * {
+  margin: revert-layer;
+  padding: revert-layer;
+}
+.landing-page :is(h1, h2, h3, h4) {
+  font-size: revert-layer;
+  font-weight: revert-layer;
+  line-height: revert-layer;
+  letter-spacing: revert-layer;
+  color: revert-layer;
+}
+/* `a { color: inherit }` and `button { color: inherit; background: transparent }`
+   were overriding text-colour / bg utilities on landing links & buttons. */
+.landing-page :is(a, button) {
+  color: revert-layer;
+}
+.landing-page button[class*="bg-"] {
+  background: revert-layer;
+}
+
+/* Smooth-scroll anchors land below the fixed nav */
+html {
+  scroll-behavior: smooth;
+}
+.landing-page [id] {
+  scroll-margin-top: 80px;
+}
+
+/* ──────────  Display / accent type  ────────── */
+.landing-page .font-display {
+  font-family: "Bricolage Grotesque", "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.025em;
+}
+.landing-page .font-accent {
+  font-family: "Fraunces", "Bricolage Grotesque", ui-serif, Georgia, serif;
+  font-style: italic;
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+}
+
+/* ──────────  Gradients  ────────── */
+.landing-page .text-gradient {
+  background: linear-gradient(135deg, #294ea7 0%, #4a7dd4 50%, #294ea7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.landing-page .text-gradient-white {
+  background: linear-gradient(135deg, #ffffff 0%, #c8d8f8 50%, #ffffff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ──────────  Film grain overlay (dark hero/cta)  ────────── */
+.landing-page .grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* ──────────  Premium card shadows  ────────── */
+.landing-page .shadow-card {
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 12px -4px rgba(15, 23, 42, 0.06);
+}
+.landing-page .shadow-card-hover,
+.landing-page .hover\:shadow-card-hover:hover {
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 12px 30px -8px rgba(41, 78, 167, 0.18),
+    0 4px 10px -4px rgba(15, 23, 42, 0.08);
+}
+
+/* ──────────  Reveal-on-scroll  ────────── */
+.landing-page .reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform;
+}
+.landing-page .reveal.reveal-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+.landing-page .reveal-delay-1 { transition-delay: 0.06s; }
+.landing-page .reveal-delay-2 { transition-delay: 0.12s; }
+.landing-page .reveal-delay-3 { transition-delay: 0.18s; }
+.landing-page .reveal-delay-4 { transition-delay: 0.24s; }
+.landing-page .reveal-delay-5 { transition-delay: 0.30s; }
+.landing-page .reveal-delay-6 { transition-delay: 0.36s; }
+.landing-page .reveal-delay-7 { transition-delay: 0.42s; }
+.landing-page .reveal-delay-8 { transition-delay: 0.48s; }
+
+/* ──────────  Shine sweep on light buttons  ────────── */
+.landing-page .btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.landing-page .btn-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+.landing-page .btn-shine:hover::after {
+  transform: translateX(120%);
+}
+
+/* ──────────  Animations  ────────── */
+.landing-page .animate-fade-up {
+  animation: landing-fade-up 0.6s ease-out forwards;
+}
+.landing-page .animate-float {
+  animation: landing-float 6s ease-in-out infinite;
+}
+.landing-page .halo-pulse {
+  animation: landing-halo-pulse 4.5s ease-in-out infinite;
+}
+
+@keyframes landing-fade-up {
+  0% { opacity: 0; transform: translateY(24px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes landing-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes landing-halo-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.05); }
+}
+
+/* Phone preview: hide scrollbars on the inner screen */
+.landing-page .screen-scroll {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.landing-page .screen-scroll::-webkit-scrollbar {
+  display: none;
+}

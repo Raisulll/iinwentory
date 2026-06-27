@@ -1,0 +1,22 @@
+# iinwentory — https://iinwentory.com
+# Allow crawling of the public marketing landing page.
+# Authenticated app routes (/dashboard, /items, …) require login and carry
+# no crawlable content, so we steer bots away from them.
+
+User-agent: *
+Allow: /$
+Allow: /login
+Disallow: /dashboard
+Disallow: /items
+Disallow: /scanner
+Disallow: /search
+Disallow: /tags
+Disallow: /workflows
+Disallow: /pick-mode
+Disallow: /reports
+Disallow: /settings
+Disallow: /notifications
+Disallow: /onboarding
+Disallow: /admin
+
+Sitemap: https://iinwentory.com/sitemap.xml
