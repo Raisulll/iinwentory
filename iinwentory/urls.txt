@@ -1,0 +1,18 @@
+Retrieving project…
+Fetching deployments in ishmum99s-projects
+> Deployments for ishmum99s-projects/iinwentory [313ms]
+
+  Age     Project                           Deployment                                                     Status      Environment     Duration     Username     
+  46s     ishmum99s-projects/iinwentory     https://iinwentory-iocbfwnhr-ishmum99s-projects.vercel.app     ● Ready     Production      18s          ishmum99     
+  21d     ishmum99s-projects/iinwentory     https://iinwentory-5gm0ddrdv-ishmum99s-projects.vercel.app     ● Error     Production      ?            ishmum99     
+  21d     ishmum99s-projects/iinwentory     https://iinwentory-7fs7muhh7-ishmum99s-projects.vercel.app     ● Error     Production      ?            ishmum99     
+  21d     ishmum99s-projects/iinwentory     https://iinwentory-o0yo33vge-ishmum99s-projects.vercel.app     ● Error     Production      ?            ishmum99     
+  21d     ishmum99s-projects/iinwentory     https://iinwentory-5pn7tufzw-ishmum99s-projects.vercel.app     ● Error     Production      ?            ishmum99     
+  21d     ishmum99s-projects/iinwentory     https://iinwentory-5wwk0mp7l-ishmum99s-projects.vercel.app     ● Ready     Production      59s          ishmum99     
+
+https://iinwentory-iocbfwnhr-ishmum99s-projects.vercel.app
+https://iinwentory-5gm0ddrdv-ishmum99s-projects.vercel.app
+https://iinwentory-7fs7muhh7-ishmum99s-projects.vercel.app
+https://iinwentory-o0yo33vge-ishmum99s-projects.vercel.app
+https://iinwentory-5pn7tufzw-ishmum99s-projects.vercel.app
+https://iinwentory-5wwk0mp7l-ishmum99s-projects.vercel.app

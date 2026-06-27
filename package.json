@@ -1,0 +1,21 @@
+{
+  "name": "sortly-clone-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm run install:all",
+    "install:all": "cd server && npm install && cd ../iinwentory && npm install && cd ../marketing && npm install",
+    "dev": "npx concurrently \"npm run dev:server\" \"npm run dev:web\" \"npm run dev:marketing\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:web": "cd iinwentory && npm run dev",
+    "dev:marketing": "cd marketing && npm run dev",
+    "db:up": "cd server && npm run db:up",
+    "db:down": "cd server && npm run db:down",
+    "db:reset": "cd server && npm run db:reset",
+    "db:studio": "cd server && npm run db:studio",
+    "db:generate": "cd server && npm run db:generate"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

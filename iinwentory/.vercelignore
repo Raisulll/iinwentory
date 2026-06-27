@@ -1,0 +1,7 @@
+node_modules
+build_errors.txt
+errors2.txt
+ts_errors.txt
+urls.txt
+.env.local
+.env

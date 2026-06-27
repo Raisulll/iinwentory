@@ -1,0 +1,64 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+build/
+**/build/
+.next/
+.nuxt/
+.output/
+
+# Env / secrets (keep .env.example)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Vercel
+.vercel/
+**/.vercel/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.swp
+
+# Local backups & uploads
+backups/
+**/uploads/
+
+# Misc
+*.local
+ts_errors.txt
+errors2.txt
+build_errors.txt
+
+# Claude session state
+.claude/scheduled_tasks.lock
+.claude/sessions/
+.claude/logs/
+
+# APK analysis artifacts (large + binary, exceeds GitHub 100MB)
+*.apk
+_apk_extract/
+
+# Local marketing snapshots
+marketing/.backup-*/
+
+# Stray dragdrop assets at repo root
+/imperial-trends-logo*.png

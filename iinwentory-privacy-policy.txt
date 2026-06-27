@@ -1,0 +1,156 @@
+PRIVACY POLICY
+
+Last updated: April 27, 2026
+
+This Privacy Policy describes how iinwentory ("we", "us", "the app") collects, uses, and protects your information when you use our mobile application.
+
+
+1. INFORMATION WE COLLECT
+
+Account Information
+When you create an account, we collect:
+- Email address
+- Password (stored as a one-way hash by our authentication provider)
+- Full name
+- Optional business name and business address
+- Optional profile photo
+
+Inventory Data
+You provide content to the app, including:
+- Item names, SKUs, barcodes, quantities, prices, locations, and photos
+- Folder and tag organization
+- Pick lists and pick list comments
+- Stock counts and purchase orders
+- Team and team member information
+
+Camera and Photos
+- The camera is used to scan barcodes and QR codes, and to take photos of inventory items.
+- The photo library is accessed only when you choose to select an existing photo as an item image.
+- We do not access, scan, or upload any photos other than those you explicitly choose to attach to an item or your profile.
+
+Biometric Authentication
+- Face ID, Touch ID, and fingerprint data are used only on your device to unlock the app.
+- Biometric data never leaves your device and is never transmitted to our servers. The operating system handles all biometric verification.
+
+Activity and Audit Logs
+We log actions you take in the app (creating, editing, deleting items, pick list operations, etc.) for audit and team-collaboration purposes. These logs are tied to your user account and visible to members of your team.
+
+Technical Information
+- Authentication session tokens (stored securely on your device)
+- Crash and diagnostic information may be collected by Apple App Store / Google Play Store via standard platform tooling
+
+We do NOT collect:
+- Advertising identifiers
+- Location data
+- Contacts
+- Microphone audio (the RECORD_AUDIO permission appears as a dependency of the camera library but is not used by the app)
+- Browsing history outside the app
+
+
+2. HOW WE USE YOUR INFORMATION
+
+We use the information we collect to:
+- Provide core inventory management features
+- Authenticate you and keep your account secure
+- Allow team members to collaborate on shared inventory
+- Provide an audit trail of changes
+- Respond to support requests
+- Comply with legal obligations
+
+We do NOT sell your data, share it with advertisers, or use it for advertising purposes.
+
+
+3. HOW YOUR DATA IS STORED
+
+- Your data is stored in Supabase (PostgreSQL database and object storage), hosted in the EU West (Ireland) region.
+- All data in transit is encrypted via HTTPS/TLS.
+- All data at rest is encrypted by our infrastructure providers.
+- Item photos are stored in a private storage bucket accessible only to authenticated members of your team.
+- Row-level security policies enforce that you can only see and modify data belonging to you or your team.
+
+
+4. DATA SHARING
+
+We share your data only as follows:
+- With members of your team: Other users in the same team can view and modify shared inventory data, pick lists, and team-level activity logs.
+- With our service providers: Supabase (authentication, database, storage). These providers process data on our behalf and are bound by their own privacy and security commitments.
+- When required by law: If we receive a valid legal request (subpoena, court order), we may be required to disclose data.
+
+We do not sell, rent, or trade your personal information to third parties.
+
+
+5. YOUR RIGHTS
+
+Depending on your jurisdiction (GDPR, CCPA, etc.), you may have the right to:
+- Access the personal data we hold about you
+- Correct inaccurate data
+- Request deletion of your account and associated data
+- Export your data in a portable format
+- Object to or restrict certain processing
+- Withdraw consent at any time
+
+To exercise any of these rights, contact us at the email below. We will respond within 30 days.
+
+
+6. DATA RETENTION
+
+- We retain your account and inventory data for as long as your account is active.
+- If you delete your account, we will delete or anonymize your personal data within 30 days, except where retention is required for legal, accounting, or security purposes.
+- Activity log entries may be retained for up to 12 months for audit purposes after account deletion.
+
+
+7. CHILDREN'S PRIVACY
+
+iinwentory is not directed to children under 13 (or under 16 in the EU). We do not knowingly collect personal information from children. If you believe a child has provided us with personal information, please contact us and we will delete it.
+
+
+8. PERMISSIONS SUMMARY (ANDROID & iOS)
+
+Camera                              Scan barcodes / QR codes, take item photos
+Photo library                       Let you choose existing photos for items
+Biometric / Face ID / Fingerprint   Local app lock (data never leaves device)
+Internet                            Sync inventory data with our servers
+Record audio                        Declared as a dependency of the camera library; not used by the app
+
+You can revoke any permission at any time in your device's system settings.
+
+
+9. SECURITY
+
+We follow industry-standard practices to protect your information, including:
+- Encryption in transit (HTTPS/TLS) and at rest
+- Strong password hashing
+- Row-level security on the database
+- Regular security review of dependencies
+
+No system is perfectly secure. If you discover a vulnerability, please report it to the contact email below.
+
+
+10. INTERNATIONAL DATA TRANSFERS
+
+If you access the app from outside the European Union, your data will be transferred to and processed in the EU (where our infrastructure is hosted). By using the app, you consent to this transfer.
+
+
+11. THIRD-PARTY SERVICES
+
+The app uses the following third-party services. Each has its own privacy policy:
+- Supabase (authentication, database, and file storage): https://supabase.com/privacy
+- Expo / EAS (over-the-air updates and build infrastructure): https://expo.dev/privacy
+- Apple App Store / Google Play Store (app distribution and standard platform diagnostics)
+
+
+12. CHANGES TO THIS POLICY
+
+We may update this Privacy Policy from time to time. The "Last updated" date at the top of this page will reflect the most recent revision. For significant changes, we will notify you in the app or via email.
+
+
+13. CONTACT
+
+If you have any questions about this Privacy Policy or your data, please contact:
+
+Email: hello@iinwentory.com
+
+
+---
+
+iinwentory is an inventory management app for warehouses and businesses, providing barcode scanning, pick lists, and team collaboration features.

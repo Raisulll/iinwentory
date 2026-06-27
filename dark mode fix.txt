@@ -1,0 +1,146 @@
+Here's a detailed audit of every UI/UX dark mode issue I found across all pages of the app:
+
+---
+
+# iinwentory — Dark Mode UI/UX Audit
+
+---
+
+## 1. Global Loading Screen — White Background Flash
+
+**Where:** Every page transition (Items, Search, Tags, Reports, Notifications, Settings, Workflows, Team)
+
+**Issue:** The full-page loading screen (`Loading...` spinner) uses a pure white (`#ffffff`) background. Every time a user navigates between pages, there is a jarring white flash before the content loads. This is the single most disruptive dark mode issue in the entire app — it feels like a completely broken mode because the very first thing you see on each navigation is the opposite of dark.
+
+**Fix:** Set the loading screen container background to match the app's main dark background (approximately `#0d0f1a` or whatever CSS variable is used for the root background). The spinner color and "Loading…" text should also be adjusted to a light/muted color rather than the dark default.
+
+---
+
+## 2. Dashboard — "Items That Need Restocking" Alert Rows
+
+**Where:** Dashboard → restocking list
+
+**Issue:** Every single alert row in the "Items that need restocking" section uses a light pinkish-red background (`#fff1f0` or similar). Against the dark page background (`#0d0f1a`), these rows are aggressively bright — they look like light mode components dropped into a dark page. The item name text also appears muted/nearly invisible against the light row background, making the most important piece of information (what needs restocking) hard to read. The outer border of each row is also very faint, giving poor separation between rows.
+
+**Fix:** Replace the light red background with a dark, desaturated red tint — something like `rgba(239, 68, 68, 0.12)` or a `#1e0e0e` deep red tone. The item name text should be `#f0f0f0` or white. The warning icon and quantity values can keep their red/orange color for emphasis. The border between rows should be a subtle dark separator (e.g. `rgba(255,255,255,0.06)`).
+
+---
+
+## 3. Notifications Page — Alert Rows (Same Issue as Dashboard)
+
+**Where:** Notifications → Low Stock Alerts tab
+
+**Issue:** Identical to issue #2 above. All 221 stock alert rows use the same light pink/red background. The problem is even more prominent here because the entire visible page area is filled with these bright light-background cards floating on the dark page. There is also visible heavy contrast banding between each card border and the dark page background — the black separator lines between cards are excessively thick/dark, creating a harsh striped visual pattern.
+
+**Fix:** Same as #2. Use a dark semi-transparent red for the card background. Additionally, the "Restock needed" badge on the right should also be adapted — currently it's a solid red pill which is fine, but it clashes with the light card background. On the corrected dark card, it will look better.
+
+---
+
+## 4. Items Page — Item Card Thumbnail Area (Grid View)
+
+**Where:** Items → All Items → Items section (grid view), item cards
+
+**Issue:** Item cards that have no image show a placeholder box icon on a very light grey background (`#f0f2f5` or similar). This is a light-mode thumbnail placeholder that has not been updated for dark mode. The card footer area (with the item name, units, and price) is correctly dark-themed, but the top thumbnail half of each card is conspicuously bright.
+
+**Fix:** Change the placeholder/thumbnail background on image-less items to a dark neutral like `#1e2130` or `#252a3a`. The package box icon within it can become a lighter muted tone (e.g. `#4a5270`).
+
+---
+
+## 5. Search Page — Left Filter Panel White Background
+
+**Where:** Search (Advanced Search) → left sidebar "Filters" panel
+
+**Issue:** The entire left filter panel has a white/very-light grey background (`#f8f9fb` or similar), making it look completely disconnected from the dark main content area. The labels ("Folders", "Name / SKU / Location / ID", "Quantity", "Min Level") are dark text on a white background — pure light mode styling. The checkboxes appear as black squares. The overall panel looks like it was copy-pasted from the light mode build.
+
+**Fix:** The filter panel background should be a dark surface like `#131620` or `#1a1d2e`. Labels should be muted light text (e.g. `#a0a8c0`). Input fields for Min/Max/search should use dark input styling consistent with the search bar on the Items page (which correctly shows a dark input with placeholder text). The "APPLY FILTERS" button at the bottom is correctly styled with the brand blue, so keep that.
+
+---
+
+## 6. Settings Page — Left Sub-navigation Panel White Background
+
+**Where:** Settings → left secondary nav panel (Profile, Organization, Preferences, Data Management)
+
+**Issue:** The secondary settings navigation panel uses a white/off-white background. The nav items "Organization", "Preferences", and "Data Management" appear as dark grey text on a white background. Only "Profile" (the active item) gets a correctly-styled light blue highlight. The "Settings" heading at the top is also rendered in dark text on the white panel — completely unreadable in dark mode context.
+
+**Fix:** The settings sub-nav should use the same dark surface color as the left folder sidebar in Items (approx. `#1a1d2e`). The inactive nav item labels should be a muted light color (e.g. `#8892a8`), and the active item should retain the blue tint highlight but with light-colored text.
+
+---
+
+## 7. Workflows Page — Pick List Panel White Cards
+
+**Where:** Workflows → Pick Lists tab → the list of individual pick list entries
+
+**Issue:** Each pick list entry card (e.g. "Test – Ready", "G Bishop", "Stephen Atkins" etc.) uses a white or near-white card background. Against the dark page background, the individual cards are visually disconnected — you get a white card list sitting on a dark page. The pick list item text (customer name, ID, date) appears in dark colour on the bright card, which while technically readable, is inconsistent with the overall dark UI tone.
+
+**Fix:** Card background should be a dark elevated surface like `#1c2035` or `#1e2340`. Text should be light (white or off-white for the name, muted grey for metadata like the ID and date). The "Ready" badge pill can remain its current green/blue colour.
+
+---
+
+## 8. Reports Page — Data Table White/Light Background
+
+**Where:** Reports → Inventory Summary → the items table
+
+**Issue:** The main report data table has a very light background (near-white `#f8fafc` or similar) for its rows and container. Column headers ("Item Name", "Qty", "Unit", "Price", "Total Value") are dark text on this light background. The alternating-row or hover states compound this — some rows appear almost fully white. This entire table section renders as a large light-mode block inserted into the dark layout.
+
+**Fix:** The table container background should be `#131620` or `#1a1d2e`. Table header row should be a slightly elevated dark shade (e.g. `#1e2340`) with light text labels. Table rows should alternate with subtle dark tones (e.g. `#131620` / `#161b2a`). Text in all cells should be light (`#e0e4f0` for primary, `#8892a8` for secondary/muted values).
+
+---
+
+## 9. Sidebar — Items Usage Count Bar (Red Overflow Indicator)
+
+**Where:** Sidebar bottom → "Items 271 / 100" progress bar
+
+**Issue:** The "Items 271 / 100" line shows a bright red overfill progress bar (because the user is over the 100-item free limit). While the intent to signal the limit is clear, the bright red bar directly above the user's profile name creates a visually jarring strip of red at the very bottom of an otherwise well-designed dark sidebar. There is no visual breathing room and the bar has no label explaining what it means without a tooltip.
+
+**Fix:** Reduce the visual weight of this bar slightly (keep it red but maybe at 80% opacity, or add a subtle glow effect consistent with dark mode warning patterns). Consider adding a small tooltip or hover state that says "You've exceeded the free plan item limit" rather than relying on the raw numbers alone.
+
+---
+
+## 10. Sidebar — "Labs" Item Disabled State Contrast
+
+**Where:** Sidebar → Labs (with "Beta" badge)
+
+**Issue:** The "Labs" navigation item appears dimmed/disabled (lower opacity grey text) because it is likely locked behind a plan. Against the medium-blue sidebar background, the combination of the already-muted grey icon + light grey text + the separately-styled "Beta" badge (which has a visible border with low contrast) produces a near-invisible navigation item. It is genuinely hard to tell whether this is clickable.
+
+**Fix:** Give the disabled Labs item slightly more contrast — maybe `#8892b8` text rather than the current very faint grey — while still making it visually distinct from active items. The "Beta" badge could use a subtle dark blue background with a muted border so it reads as a badge rather than just noise.
+
+---
+
+## 11. Items Page Banner — "Free Plan Limit" Alert Styling
+
+**Where:** Items → top banner warning
+
+**Issue:** The "You've reached the 100-item limit on the Free plan." banner uses a light pink/salmon background (same light-red family as the restocking alerts). It floats as a bright band at the top of the content area. While it's deliberately attention-grabbing, it breaks the dark theme significantly.
+
+**Fix:** Use a dark red/amber tint for the background: something like `rgba(239, 68, 68, 0.15)` with a `1px solid rgba(239, 68, 68, 0.3)` border. The text can remain red/orange for the warning tone. The "Upgrade Plan" button is correctly styled with a solid red fill, so keep that — it provides enough punch.
+
+---
+
+## 12. Team Page — Invite Code Rows Light Background
+
+**Where:** Team → Pending Invites section
+
+**Issue:** The active invite code rows (the ones with "expires 5/11/2026") have a very slightly lighter background compared to the expired/used rows, but the contrast difference between them is subtle and not clearly communicated. More critically, the code value displayed in the grey pill/badge on the left side of each row is shown as a light grey box with dark text — which has poor visibility in dark mode and looks out of place.
+
+**Fix:** All invite rows should use consistent dark card surfaces (`#1a1d2e`). Active invites could have a subtle left border accent in green or blue to signal active state. Expired/used rows should have lower opacity text rather than a different background shade.
+
+---
+
+## Summary Table
+
+| # | Page | Component | Issue Type | Priority |
+|---|------|-----------|------------|----------|
+| 1 | All pages | Loading screen | White background flash | Critical |
+| 2 | Dashboard | Restocking alert rows | Light bg on dark page | Critical |
+| 3 | Notifications | Low stock alert rows | Light bg on dark page | Critical |
+| 4 | Items | Item card thumbnails | Light placeholder bg | High |
+| 5 | Search | Filter panel | Entire panel unthemed | High |
+| 6 | Settings | Sub-nav panel | Entire panel unthemed | High |
+| 7 | Workflows | Pick list cards | White card bg | High |
+| 8 | Reports | Data table | Light table on dark page | High |
+| 9 | Sidebar | Item limit bar | Harsh red bar, no context | Medium |
+| 10 | Sidebar | Labs nav item | Poor disabled contrast | Low |
+| 11 | Items | Free plan banner | Light alert bg | Medium |
+| 12 | Team | Invite code rows | Minor contrast/state issues | Low |
+
+The **top 3 priorities** to fix are the loading screen flash (#1), the restocking/alert row backgrounds (#2 and #3), and the unthemed panels in Search and Settings (#5 and #6) — these are the most visually disruptive and touch nearly every workflow a user goes through.

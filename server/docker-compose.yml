@@ -1,0 +1,26 @@
+# Local Postgres that mirrors the Supabase schema for dev work.
+# When you have a real Supabase project, set DATABASE_URL in .env to its
+# pooler URL and ignore this file (or just stop the container).
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: iinwentory-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: iinwentory
+      POSTGRES_USER: iinwentory
+      POSTGRES_PASSWORD: iinwentory
+    ports:
+      - "54322:5432"
+    volumes:
+      - iinwentory_pgdata:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iinwentory -d iinwentory"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  iinwentory_pgdata:

@@ -1,0 +1,666 @@
+// Schema mirrors Supabase project ovahczsudvwcuwvmapyi (production, shared
+// with the Android app). The 5 web_* helper tables below are added by the
+// `web_only_extensions_for_website` migration and are not used by Android.
+// Source of truth: ../../backups/2026-04-22/schema/*.sql + that migration.
+//
+// auth.users is owned by Supabase. Locally it is created by `init/00_auth.sql`
+// which mirrors the Supabase shape so the same FKs apply.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["auth", "public"]
+}
+
+// ── auth.users (Supabase managed) ─────────────────────────────────────────
+
+model AuthUser {
+  id    String  @id @db.Uuid
+  email String? @unique
+
+  profile         Profile?
+  createdTeams    Team[]              @relation("TeamCreatedBy")
+  teamMemberships TeamMember[]
+  invitesCreated  TeamInvite[]        @relation("InviteCreatedBy")
+  invitesUsed     TeamInvite[]        @relation("InviteUsedBy")
+  foldersCreated  Folder[]            @relation("FolderCreatedBy")
+  tagsCreated     Tag[]               @relation("TagCreatedBy")
+  pickListIssues  PickListIssue[]     @relation("IssueReportedBy")
+  cfaGranted      ClientFolderAccess[] @relation("CfaGrantedBy")
+  cfaUser         ClientFolderAccess[] @relation("CfaUser")
+
+  @@map("users")
+  @@schema("auth")
+}
+
+// ── public.profiles ────────────────────────────────────────────────────────
+
+model Profile {
+  id                 String   @id @db.Uuid
+  fullName           String?  @map("full_name")
+  avatarUrl          String?  @map("avatar_url")
+  role               String   @default("member")
+  pinHash            String?  @map("pin_hash")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  department         String?
+  permissions        Json?    @default("{\"role\": \"member\"}")
+  businessName       String?  @map("business_name")
+  businessAddress    String?  @map("business_address")
+  passwordWasReset   Boolean? @default(false) @map("password_was_reset")
+
+  user               AuthUser @relation(fields: [id], references: [id], onDelete: Cascade)
+  teamMember         TeamMember?
+  notifications      Notification[]
+  pickListsAssigned  PickList[]    @relation("PickListAssignedTo")
+
+  @@index([role], map: "idx_profiles_role")
+  @@map("profiles")
+  @@schema("public")
+}
+
+// ── public.teams ───────────────────────────────────────────────────────────
+
+model Team {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  creator               AuthUser?            @relation("TeamCreatedBy", fields: [createdBy], references: [id])
+  members               TeamMember[]
+  invites               TeamInvite[]
+  folders               Folder[]
+  items                 Item[]
+  tags                  Tag[]
+  itemTags              ItemTag[]
+  pickLists             PickList[]
+  pickListItems         PickListItem[]
+  pickListComments      PickListComment[]
+  pickListIssues        PickListIssue[]
+  activityLogs          ActivityLog[]
+  transactions          Transaction[]
+  stockCounts           StockCount[]
+  purchaseOrders        PurchaseOrder[]
+  clientFolderAccess    ClientFolderAccess[]
+
+  @@map("teams")
+  @@schema("public")
+}
+
+// ── public.team_members ────────────────────────────────────────────────────
+
+model TeamMember {
+  id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId   String    @map("team_id") @db.Uuid
+  userId   String    @unique(map: "team_members_user_id_unique") @map("user_id") @db.Uuid
+  role     String    @default("member")
+  joinedAt DateTime? @default(now()) @map("joined_at") @db.Timestamptz(6)
+
+  team    Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user    AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile  @relation(fields: [userId], references: [id], onDelete: Cascade, map: "team_members_user_id_profiles_fkey")
+
+  @@unique([teamId, userId], map: "team_members_team_id_user_id_key")
+  @@index([teamId], map: "idx_team_members_team_id")
+  @@index([userId], map: "idx_team_members_user_id")
+  @@map("team_members")
+  @@schema("public")
+}
+
+// ── public.team_invites ────────────────────────────────────────────────────
+
+model TeamInvite {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId     String    @map("team_id") @db.Uuid
+  inviteCode String    @unique(map: "team_invites_invite_code_key") @map("invite_code")
+  createdBy  String?   @map("created_by") @db.Uuid
+  expiresAt  DateTime? @default(dbgenerated("(now() + '7 days'::interval)")) @map("expires_at") @db.Timestamptz(6)
+  usedBy     String?   @map("used_by") @db.Uuid
+  createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  team    Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  creator AuthUser? @relation("InviteCreatedBy", fields: [createdBy], references: [id])
+  user    AuthUser? @relation("InviteUsedBy", fields: [usedBy], references: [id])
+
+  @@index([inviteCode], map: "idx_team_invites_code")
+  @@map("team_invites")
+  @@schema("public")
+}
+
+// ── public.folders ─────────────────────────────────────────────────────────
+
+model Folder {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  parentFolderId String?  @map("parent_folder_id") @db.Uuid
+  icon           String?
+  colour         String?
+  description    String?
+  sku            String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  teamId         String?  @map("team_id") @db.Uuid
+  createdBy      String?  @map("created_by") @db.Uuid
+  coverImage     String?  @map("cover_image")
+
+  parent             Folder?              @relation("FolderToFolder", fields: [parentFolderId], references: [id], onDelete: SetNull)
+  children           Folder[]             @relation("FolderToFolder")
+  team               Team?                @relation(fields: [teamId], references: [id])
+  creator            AuthUser?            @relation("FolderCreatedBy", fields: [createdBy], references: [id])
+  items              Item[]
+  clientFolderAccess ClientFolderAccess[]
+
+  @@index([parentFolderId], map: "idx_folders_parent")
+  @@index([teamId], map: "idx_folders_team_id")
+  @@map("folders")
+  @@schema("public")
+}
+
+// ── public.items ───────────────────────────────────────────────────────────
+
+model Item {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  description   String?
+  sku           String?
+  quantity      Int      @default(0)
+  minQuantity   Int      @default(0) @map("min_quantity")
+  costPrice     Decimal? @map("cost_price") @db.Decimal
+  sellPrice     Decimal? @map("sell_price") @db.Decimal
+  weight        Decimal? @db.Decimal
+  dimensions    Json?
+  photos        String[]
+  customFields  Json     @default("{}") @map("custom_fields")
+  folderId      String?  @map("folder_id") @db.Uuid
+  location      String?
+  notes         String?
+  status        String   @default("active")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy     String?  @map("created_by") @db.Uuid
+  teamId        String?  @map("team_id") @db.Uuid
+
+  folder              Folder?              @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  team                Team?                @relation(fields: [teamId], references: [id])
+  itemTags            ItemTag[]
+  pickListItems       PickListItem[]
+  transactions        Transaction[]
+  stockCountItems     StockCountItem[]
+  purchaseOrderItems  PurchaseOrderItem[]
+
+  @@index([createdBy], map: "idx_items_created_by")
+  @@index([folderId], map: "idx_items_folder_id")
+  @@index([name], map: "idx_items_name")
+  @@index([sku], map: "idx_items_sku")
+  @@index([status], map: "idx_items_status")
+  @@index([teamId], map: "idx_items_team_id")
+  @@map("items")
+  @@schema("public")
+}
+
+// ── public.tags ────────────────────────────────────────────────────────────
+
+model Tag {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  colour    String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  teamId    String?  @map("team_id") @db.Uuid
+  createdBy String?  @map("created_by") @db.Uuid
+
+  team     Team?     @relation(fields: [teamId], references: [id])
+  creator  AuthUser? @relation("TagCreatedBy", fields: [createdBy], references: [id])
+  itemTags ItemTag[]
+
+  @@index([teamId], map: "idx_tags_team_id")
+  @@map("tags")
+  @@schema("public")
+}
+
+// ── public.item_tags ───────────────────────────────────────────────────────
+
+model ItemTag {
+  itemId String  @map("item_id") @db.Uuid
+  tagId  String  @map("tag_id") @db.Uuid
+  teamId String? @map("team_id") @db.Uuid
+
+  item Item  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  tag  Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  team Team? @relation(fields: [teamId], references: [id])
+
+  @@id([itemId, tagId])
+  @@index([tagId], map: "idx_item_tags_tag")
+  @@map("item_tags")
+  @@schema("public")
+}
+
+// ── public.pick_lists ──────────────────────────────────────────────────────
+
+model PickList {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  status     String   @default("draft")
+  assignedTo String?  @map("assigned_to") @db.Uuid
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy  String?  @map("created_by") @db.Uuid
+  teamId     String?  @map("team_id") @db.Uuid
+  clientId   String?  @map("client_id") @db.Uuid
+
+  team        Team?             @relation(fields: [teamId], references: [id])
+  assignee    Profile?          @relation("PickListAssignedTo", fields: [assignedTo], references: [id])
+  items       PickListItem[]
+  comments    PickListComment[]
+  issues      PickListIssue[]
+
+  @@index([createdBy], map: "idx_pick_lists_created_by")
+  @@index([status], map: "idx_pick_lists_status")
+  @@index([teamId], map: "idx_pick_lists_team_id")
+  @@map("pick_lists")
+  @@schema("public")
+}
+
+// ── public.pick_list_items ─────────────────────────────────────────────────
+
+model PickListItem {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pickListId        String    @map("pick_list_id") @db.Uuid
+  itemId            String    @map("item_id") @db.Uuid
+  quantityRequested Int       @default(1) @map("quantity_requested")
+  quantityPicked    Int       @default(0) @map("quantity_picked")
+  locationHint      String?   @map("location_hint")
+  unitPrice         Decimal?  @map("unit_price") @db.Decimal
+  pickedAt          DateTime? @map("picked_at") @db.Timestamptz(6)
+  pickedBy          String?   @map("picked_by") @db.Uuid
+  sortOrder         Int       @default(0) @map("sort_order")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  teamId            String?   @map("team_id") @db.Uuid
+
+  pickList PickList         @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+  item     Item             @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  team     Team?            @relation(fields: [teamId], references: [id])
+  issues   PickListIssue[]
+
+  @@index([itemId], map: "idx_pick_list_items_item")
+  @@index([pickListId], map: "idx_pick_list_items_pick_list")
+  @@map("pick_list_items")
+  @@schema("public")
+}
+
+// ── public.pick_list_comments ──────────────────────────────────────────────
+
+model PickListComment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pickListId String   @map("pick_list_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  content    String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  teamId     String?  @map("team_id") @db.Uuid
+
+  pickList PickList @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+  team     Team?    @relation(fields: [teamId], references: [id])
+
+  @@index([pickListId], map: "idx_pick_list_comments_pick_list")
+  @@map("pick_list_comments")
+  @@schema("public")
+}
+
+// ── public.pick_list_issues ────────────────────────────────────────────────
+
+model PickListIssue {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pickListId             String   @map("pick_list_id") @db.Uuid
+  pickListItemId         String   @map("pick_list_item_id") @db.Uuid
+  issueType              String   @map("issue_type")
+  quantityAffected       Int      @default(0) @map("quantity_affected")
+  quantityActuallyPicked Int      @default(0) @map("quantity_actually_picked")
+  notes                  String?
+  reportedBy             String?  @map("reported_by") @db.Uuid
+  teamId                 String?  @map("team_id") @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  pickList     PickList     @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+  pickListItem PickListItem @relation(fields: [pickListItemId], references: [id], onDelete: Cascade)
+  team         Team?        @relation(fields: [teamId], references: [id])
+  reporter     AuthUser?    @relation("IssueReportedBy", fields: [reportedBy], references: [id])
+
+  @@index([pickListId], map: "idx_pick_list_issues_pick_list_id")
+  @@index([pickListItemId], map: "idx_pick_list_issues_pick_list_item_id")
+  @@index([teamId], map: "idx_pick_list_issues_team_id")
+  @@map("pick_list_issues")
+  @@schema("public")
+}
+
+// ── public.activity_log ────────────────────────────────────────────────────
+
+model ActivityLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  actionType String   @map("action_type")
+  itemId     String?  @map("item_id") @db.Uuid
+  pickListId String?  @map("pick_list_id") @db.Uuid
+  details    Json     @default("{}")
+  timestamp  DateTime @default(now()) @db.Timestamptz(6)
+  teamId     String?  @map("team_id") @db.Uuid
+
+  team Team? @relation(fields: [teamId], references: [id])
+
+  @@index([itemId], map: "idx_activity_log_item")
+  @@index([pickListId], map: "idx_activity_log_pick_list")
+  @@index([teamId], map: "idx_activity_log_team_id")
+  // Matches the /api/activity query exactly (WHERE team_id ORDER BY timestamp DESC, id DESC)
+  // so cursor pagination is a clean index scan instead of scan+filter+sort.
+  @@index([teamId, timestamp(sort: Desc), id(sort: Desc)], map: "idx_activity_log_team_timestamp")
+  @@index([timestamp(sort: Desc)], map: "idx_activity_log_timestamp")
+  @@index([userId], map: "idx_activity_log_user")
+  @@map("activity_log")
+  @@schema("public")
+}
+
+// ── public.notifications ───────────────────────────────────────────────────
+
+model Notification {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String?  @map("user_id") @db.Uuid
+  type              String   @default("info")
+  title             String
+  message           String?
+  relatedItemId     String?  @map("related_item_id") @db.Uuid
+  relatedPickListId String?  @map("related_pick_list_id") @db.Uuid
+  isRead            Boolean  @default(false) @map("is_read")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  profile Profile? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)], map: "idx_notifications_created")
+  @@index([isRead], map: "idx_notifications_read")
+  @@index([userId], map: "idx_notifications_user")
+  @@map("notifications")
+  @@schema("public")
+}
+
+// ── public.transactions ────────────────────────────────────────────────────
+
+model Transaction {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  itemId          String?  @map("item_id") @db.Uuid
+  transactionType String   @map("transaction_type")
+  quantityBefore  Int      @default(0) @map("quantity_before")
+  quantityAfter   Int      @default(0) @map("quantity_after")
+  quantityChange  Int      @default(0) @map("quantity_change")
+  referenceId     String?  @map("reference_id") @db.Uuid
+  referenceType   String?  @map("reference_type")
+  performedBy     String?  @map("performed_by") @db.Uuid
+  notes           String?
+  folderName      String?  @map("folder_name")
+  itemName        String?  @map("item_name")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  teamId          String?  @map("team_id") @db.Uuid
+
+  item Item? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  team Team? @relation(fields: [teamId], references: [id])
+
+  @@index([createdAt(sort: Desc)], map: "idx_transactions_created")
+  @@index([itemId], map: "idx_transactions_item")
+  @@index([performedBy], map: "idx_transactions_performed_by")
+  @@index([teamId], map: "idx_transactions_team_id")
+  @@index([transactionType], map: "idx_transactions_type")
+  @@map("transactions")
+  @@schema("public")
+}
+
+// ── public.stock_counts ────────────────────────────────────────────────────
+
+model StockCount {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  status      String    @default("draft")
+  notes       String?
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  teamId      String?   @map("team_id") @db.Uuid
+
+  team  Team?            @relation(fields: [teamId], references: [id])
+  items StockCountItem[]
+
+  @@index([createdBy], map: "idx_stock_counts_created_by")
+  @@index([status], map: "idx_stock_counts_status")
+  @@index([teamId], map: "idx_stock_counts_team_id")
+  @@map("stock_counts")
+  @@schema("public")
+}
+
+// ── public.stock_count_items ───────────────────────────────────────────────
+
+model StockCountItem {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stockCountId     String    @map("stock_count_id") @db.Uuid
+  itemId           String    @map("item_id") @db.Uuid
+  expectedQuantity Int       @default(0) @map("expected_quantity")
+  countedQuantity  Int?      @map("counted_quantity")
+  difference       Int?
+  countedBy        String?   @map("counted_by") @db.Uuid
+  countedAt        DateTime? @map("counted_at") @db.Timestamptz(6)
+  notes            String?
+
+  stockCount StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+  item       Item       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId], map: "idx_stock_count_items_item")
+  @@index([stockCountId], map: "idx_stock_count_items_sc")
+  @@map("stock_count_items")
+  @@schema("public")
+}
+
+// ── public.purchase_orders ─────────────────────────────────────────────────
+
+model PurchaseOrder {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  poNumber     String    @unique(map: "purchase_orders_po_number_key") @map("po_number")
+  supplierName String    @map("supplier_name")
+  status       String    @default("draft")
+  notes        String?
+  orderDate    DateTime? @default(now()) @map("order_date") @db.Timestamptz(6)
+  expectedDate DateTime? @map("expected_date") @db.Timestamptz(6)
+  createdBy    String?   @map("created_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  teamId       String?   @map("team_id") @db.Uuid
+
+  team  Team?               @relation(fields: [teamId], references: [id])
+  items PurchaseOrderItem[]
+
+  @@index([poNumber], map: "idx_purchase_orders_po_number")
+  @@index([status], map: "idx_purchase_orders_status")
+  @@index([teamId], map: "idx_purchase_orders_team_id")
+  @@map("purchase_orders")
+  @@schema("public")
+}
+
+// ── public.purchase_order_items ────────────────────────────────────────────
+
+model PurchaseOrderItem {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  poId            String    @map("po_id") @db.Uuid
+  itemId          String    @map("item_id") @db.Uuid
+  quantityOrdered Int       @default(0) @map("quantity_ordered")
+  quantityReceived Int      @default(0) @map("quantity_received")
+  unitCost        Decimal?  @map("unit_cost") @db.Decimal
+  receivedAt      DateTime? @map("received_at") @db.Timestamptz(6)
+  receivedBy      String?   @map("received_by") @db.Uuid
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  item          Item          @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId], map: "idx_po_items_item")
+  @@index([poId], map: "idx_po_items_po")
+  @@map("purchase_order_items")
+  @@schema("public")
+}
+
+// ── Web-only extension tables (init/07_web_extensions.sql) ────────────────
+
+model TeamBilling {
+  teamId               String   @id @map("team_id") @db.Uuid
+  planId               String   @default("free") @map("plan_id")
+  stripeCustomerId     String?  @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?  @unique @map("stripe_subscription_id")
+  stripePriceId        String?  @map("stripe_price_id")
+  trialEndsAt          DateTime? @map("trial_ends_at") @db.Timestamptz(6)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("team_billing")
+  @@schema("public")
+}
+
+model WebTeamSettings {
+  teamId          String   @id @map("team_id") @db.Uuid
+  currency        String   @default("£")
+  defaultView     String   @default("grid") @map("default_view")
+  lowStockAlerts  Boolean  @default(true) @map("low_stock_alerts")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("web_team_settings")
+  @@schema("public")
+}
+
+model WebRefreshToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId], map: "idx_web_refresh_tokens_user")
+  @@map("web_refresh_tokens")
+  @@schema("public")
+}
+
+model WebPickListCode {
+  pickListId String @id @map("pick_list_id") @db.Uuid
+  code       String @unique
+
+  @@map("web_pick_list_codes")
+  @@schema("public")
+}
+
+model WebPasswordReset {
+  userId    String   @id @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("web_password_resets")
+  @@schema("public")
+}
+
+// ── public.client_folder_access ────────────────────────────────────────────
+
+model ClientFolderAccess {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId    String    @map("team_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  folderId  String    @map("folder_id") @db.Uuid
+  grantedBy String?   @map("granted_by") @db.Uuid
+  grantedAt DateTime? @default(now()) @map("granted_at") @db.Timestamptz(6)
+
+  team    Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user    AuthUser  @relation("CfaUser", fields: [userId], references: [id], onDelete: Cascade)
+  folder  Folder    @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  grantor AuthUser? @relation("CfaGrantedBy", fields: [grantedBy], references: [id])
+
+  @@unique([userId, folderId], map: "client_folder_access_user_id_folder_id_key")
+  @@index([teamId, userId], map: "idx_cfa_team_user")
+  @@index([userId], map: "idx_cfa_user_id")
+  @@map("client_folder_access")
+  @@schema("public")
+}
+
+// ── public.feedback (init/08_feedback.sql) ─────────────────────────────────
+
+model Feedback {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  teamId    String?  @map("team_id") @db.Uuid
+  name      String?
+  email     String?
+  category  String   @default("general")
+  rating    Int?
+  message   String
+  page      String?
+  status    String   @default("new")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([teamId], map: "idx_feedback_team_id")
+  @@index([userId], map: "idx_feedback_user_id")
+  @@index([status], map: "idx_feedback_status")
+  @@index([createdAt(sort: Desc)], map: "idx_feedback_created")
+  @@map("feedback")
+  @@schema("public")
+}
+
+// ── public.admin_audit_log (init/09_admin.sql) ─────────────────────────────
+//
+// Immutable trail of platform super-admin actions. Distinct from activity_log,
+// which is per-team and tenant-facing — this is operator-facing and global.
+
+model AdminAuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminUserId String?  @map("admin_user_id") @db.Uuid
+  action      String
+  targetType  String?  @map("target_type")
+  targetId    String?  @map("target_id")
+  details     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([adminUserId], map: "idx_admin_audit_admin")
+  @@index([createdAt(sort: Desc)], map: "idx_admin_audit_created")
+  @@map("admin_audit_log")
+  @@schema("public")
+}
+
+// ── public.platform_admins (init/09_admin.sql) ─────────────────────────────
+//
+// Membership = platform super-admin. Kept separate from profiles.role because
+// the shared Supabase profiles_role_check only allows owner/admin/member.
+
+model PlatformAdmin {
+  userId    String   @id @map("user_id") @db.Uuid
+  grantedBy String?  @map("granted_by") @db.Uuid
+  grantedAt DateTime @default(now()) @map("granted_at") @db.Timestamptz(6)
+
+  @@map("platform_admins")
+  @@schema("public")
+}
+
+// ── public.announcements (init/09_admin.sql) ───────────────────────────────
+//
+// Operator broadcast banners shown to every signed-in user.
+
+model Announcement {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message   String
+  type      String    @default("info")
+  active    Boolean   @default(true)
+  startsAt  DateTime? @map("starts_at") @db.Timestamptz(6)
+  endsAt    DateTime? @map("ends_at") @db.Timestamptz(6)
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([active], map: "idx_announcements_active")
+  @@map("announcements")
+  @@schema("public")
+}

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/imperial-trends-logo.png" />
+    <link rel="apple-touch-icon" href="/imperial-trends-logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="iinwentory - Smart inventory management. Track items, folders, quantities, values, and generate QR codes for your products." />
+    <title>iinwentory — Inventory Management</title>
+
+    <!-- Preconnect to the API origin so the first auth/me + bootstrap
+         requests don't pay the TLS handshake cost on top of cold start. -->
+    <link rel="preconnect" href="https://api.iinwentory.com" crossorigin />
+    <link rel="dns-prefetch" href="https://api.iinwentory.com" />
+
+    <!-- Inline pre-React paint so users see a coloured shell within ~50ms
+         instead of a blank white screen until the JS bundle parses. -->
+    <style>
+      html, body { background: #F4F5F3; margin: 0; }
+      html[data-theme="dark"], html[data-theme="dark"] body { background: #0A0F1F; }
+      #root:empty::before {
+        content: '';
+        position: fixed; inset: 0;
+        background: linear-gradient(180deg, rgba(54,81,220,0.04) 0%, transparent 38%);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      // Apply persisted theme before React renders to avoid a flash of the wrong palette.
+      // Also accepts ?theme=dark|light query for dev/testing without logging in.
+      (function () {
+        try {
+          var qp = new URLSearchParams(location.search).get('theme');
+          if (qp === 'dark' || qp === 'light') {
+            document.documentElement.setAttribute('data-theme', qp);
+            localStorage.setItem('iinwentory_theme', qp);
+            return;
+          }
+          var t = localStorage.getItem('iinwentory_theme');
+          if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+node_modules
+dist
+uploads
+docker-compose.yml
+init/
+scripts/
+init
+README.md
+.env
+.env.local
