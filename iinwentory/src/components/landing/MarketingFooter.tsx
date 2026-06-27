@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { APP_URL } from './links';
+import { useCtaLinks } from './links';
 
 export default function MarketingFooter() {
   const year = new Date().getFullYear();
+  const { launchApp } = useCtaLinks();
 
   return (
     <footer className="bg-gray-950 text-white">
@@ -18,7 +19,7 @@ export default function MarketingFooter() {
               The smart inventory management solution for businesses of all sizes. Track, manage, and optimize your inventory with ease.
             </p>
             <div className="mt-6 flex gap-3">
-              <Link to={APP_URL} className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold hover:bg-primary-500 transition-colors">
+              <Link to={launchApp} className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold hover:bg-primary-500 transition-colors">
                 Launch App
               </Link>
             </div>

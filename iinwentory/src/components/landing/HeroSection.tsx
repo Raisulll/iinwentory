@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { registerUrl } from './links';
+import { useCtaLinks } from './links';
 
 const dashboardStats = [
   { label: 'Total Items', value: '2,847', change: '+12%', icon: '📦' },
@@ -19,6 +19,7 @@ const recentItems = [
 const gridSvg = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`;
 
 export default function HeroSection() {
+  const { getStarted } = useCtaLinks();
   // When IntersectionObserver isn't available we can't trigger the count-up,
   // so start at the final value (14) instead of animating from 0.
   const [trialDays, setTrialDays] = useState(() =>
@@ -96,7 +97,7 @@ export default function HeroSection() {
             {/* CTA Buttons */}
             <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
               <Link
-                to={registerUrl()}
+                to={getStarted}
                 className="btn-shine group relative inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-bold text-primary-700 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] ring-1 ring-white/40 transition-all duration-300 hover:bg-white hover:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)] hover:-translate-y-1 hover:ring-white/80"
               >
                 <span>Start Free Trial</span>

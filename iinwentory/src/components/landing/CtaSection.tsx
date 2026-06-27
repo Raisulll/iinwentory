@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { registerUrl } from './links';
+import { useCtaLinks } from './links';
 
 const pills = [
   '✓ Free 14-day trial',
@@ -10,6 +10,7 @@ const pills = [
 ];
 
 export default function CtaSection() {
+  const { getStarted } = useCtaLinks();
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 py-24 lg:py-32">
       {/* Background orbs */}
@@ -34,7 +35,7 @@ export default function CtaSection() {
 
         <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
           <Link
-            to={registerUrl()}
+            to={getStarted}
             className="btn-shine group inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-bold text-primary-700 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] ring-1 ring-white/40 transition-all duration-300 hover:bg-white hover:-translate-y-1 hover:ring-white/80 hover:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]"
           >
             Start Your Free Trial

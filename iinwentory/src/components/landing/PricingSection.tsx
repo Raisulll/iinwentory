@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { registerUrl } from './links';
+import { registerUrl, useCtaLinks } from './links';
 
 type Billing = 'yearly' | 'monthly';
 
@@ -240,6 +240,14 @@ function CtaLink({ href, className, children }: { href: string; className: strin
 export default function PricingSection() {
   const [billing, setBilling] = useState<Billing>('yearly');
   const [showCompare, setShowCompare] = useState(false);
+  const { planHref } = useCtaLinks();
+
+  // External (mailto) CTAs are left as-is; in-app CTAs become auth-aware so
+  // logged-in users go to Billing & Plan / checkout instead of onboarding.
+  const hrefFor = (plan: Plan) =>
+    plan.ctaHref.startsWith('mailto:') || plan.ctaHref.startsWith('http')
+      ? plan.ctaHref
+      : planHref(plan.id, billing);
 
   const displayPrice = (plan: Plan) =>
     plan.monthlyPrice === null ? null : billing === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
@@ -369,7 +377,7 @@ export default function PricingSection() {
 
                   {/* CTA */}
                   <CtaLink
-                    href={plan.ctaHref}
+                    href={hrefFor(plan)}
                     className={`mt-6 block rounded-xl px-4 py-3 text-center text-sm font-bold transition-all duration-200 ${
                       isUltra
                         ? 'bg-white text-primary-700 hover:bg-white/90 shadow-lg'
@@ -459,7 +467,7 @@ export default function PricingSection() {
                   {plans.map((plan, idx) => (
                     <td key={plan.id} className={`px-3 py-4 text-center ${idx === 2 ? 'bg-primary-50/50' : ''}`}>
                       <CtaLink
-                        href={plan.ctaHref}
+                        href={hrefFor(plan)}
                         className={`inline-block rounded-xl px-3 py-2 text-xs font-bold transition-all ${
                           plan.id === 'ultra' ? 'bg-primary-600 text-white hover:bg-primary-700' : 'border border-primary-500 text-primary-600 hover:bg-primary-50'
                         }`}

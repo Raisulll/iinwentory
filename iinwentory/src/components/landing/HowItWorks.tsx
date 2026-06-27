@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { registerUrl } from './links';
+import { useCtaLinks } from './links';
 
 const steps = [
   {
@@ -29,6 +29,7 @@ const steps = [
 ];
 
 export default function HowItWorks() {
+  const { getStarted } = useCtaLinks();
   return (
     <section id="how-it-works" className="bg-white py-24 lg:py-32">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -71,7 +72,7 @@ export default function HowItWorks() {
         {/* CTA */}
         <div className="mt-16 text-center">
           <Link
-            to={registerUrl()}
+            to={getStarted}
             className="inline-flex items-center gap-2 rounded-2xl bg-primary-600 px-8 py-4 text-base font-bold text-white shadow-lg shadow-primary-200 transition-all hover:bg-primary-700 hover:-translate-y-1 hover:shadow-xl"
           >
             Get Started Free
