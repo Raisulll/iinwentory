@@ -1,12 +1,14 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from './services/db.js';
@@ -47,6 +49,19 @@ const PORT = parseInt(process.env.PORT || '7745');
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 
+// Behind Vercel/any reverse proxy the client IP is in X-Forwarded-For. Trust the
+// first proxy hop so req.ip is the real client (rate limiters key on it).
+app.set('trust proxy', 1);
+
+// Security headers. CSP is disabled because this process only serves JSON and
+// static image uploads (no HTML app shell); the frontend host owns its own CSP.
+// CORP is relaxed to cross-origin so the web app on a different domain can embed
+// images served from /uploads.
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
   .map(s => s.trim())
@@ -67,6 +82,33 @@ app.use(cors({
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
+
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+// NOTE: the default store is in-memory. On Vercel serverless each instance keeps
+// its own counters (and cold starts reset them), so this is best-effort defense
+// in depth rather than a hard guarantee — move to a shared store (Redis) if you
+// need strict limits across instances.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,                  // brute-force / enumeration ceiling per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please try again later.' },
+});
+// Throttle the credential- and account-sensitive endpoints specifically.
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
+
+// Generous global ceiling to blunt scraping / accidental request storms.
+app.use('/api', rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' },
+}));
 
 const UPLOAD_DIR = process.env.VERCEL
   ? '/tmp/uploads'

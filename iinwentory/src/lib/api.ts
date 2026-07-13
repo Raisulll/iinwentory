@@ -1,4 +1,4 @@
-const BASE_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:7745';
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:7745';
 
 const ACCESS_TOKEN_KEY = 'iinwentory_access_token';
 const REFRESH_TOKEN_KEY = 'iinwentory_refresh_token';

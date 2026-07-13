@@ -19,6 +19,7 @@ import DateRangeFilter from '../components/DateRangeFilter';
 import { DEFAULT_DATE_RANGE, isInDateRange } from '../lib/dateRange';
 import type { DateRangeValue } from '../lib/dateRange';
 import { itemInventoryValue } from '../lib/itemValue';
+import { searchItems, tagNameMap } from '../lib/itemSearch';
 
 type ReportType = 'summary' | 'low-stock' | 'by-folder' | 'activity' | 'value' | 'transactions';
 type ReportView = 'home' | ReportType;
@@ -222,6 +223,7 @@ export default function Reports() {
 
   const [activeReport, setActiveReport] = useState<ReportView>('home');
   const [searchQuery, setSearchQuery] = useState('');
+  const [navSearch, setNavSearch] = useState('');
   const [dateRange, setDateRange] = useState<DateRangeValue>(DEFAULT_DATE_RANGE);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[] | null>(null);
@@ -324,9 +326,7 @@ export default function Reports() {
   const allFolders = store.folders;
   const rootItems = dateItems.filter(i => i.parentId === null);
 
-  const filteredItems = dateItems.filter(i =>
-    i.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredItems = searchItems(dateItems, searchQuery, { tagsById: tagNameMap(store.tags) });
 
   const statCard = (label: string, value: string | number, sub?: string, color?: string) => (
     <div className="rep-stat">
@@ -584,25 +584,49 @@ export default function Reports() {
           </h2>
           <div style={{ position: 'relative' }}>
             <Search size={14} strokeWidth={2.1} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input className="input" placeholder="Search reports" style={{ paddingLeft: 34, fontSize: '12.5px' }} />
+            <input
+              className="input"
+              placeholder="Search reports"
+              value={navSearch}
+              onChange={e => setNavSearch(e.target.value)}
+              style={{ paddingLeft: 34, fontSize: '12.5px' }}
+            />
           </div>
         </div>
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '0 12px' }}>
-          <button
-            onClick={() => setActiveReport('home')}
-            className={`rep-nav ${activeReport === 'home' ? 'active' : ''}`}
-          >
-            <LayoutGrid size={15} strokeWidth={1.9} /> Overview
-          </button>
-          {reportNav.map(r => (
-            <button
-              key={r.id}
-              onClick={() => setActiveReport(r.id)}
-              className={`rep-nav ${activeReport === r.id ? 'active' : ''}`}
-            >
-              <r.icon size={15} strokeWidth={1.9} /> {r.label}
-            </button>
-          ))}
+          {(() => {
+            const q = navSearch.trim().toLowerCase();
+            const matches = q
+              ? reportNav.filter(r => r.label.toLowerCase().includes(q) || r.desc.toLowerCase().includes(q))
+              : reportNav;
+            const showOverview = !q || 'overview'.includes(q);
+            return (
+              <>
+                {showOverview && (
+                  <button
+                    onClick={() => setActiveReport('home')}
+                    className={`rep-nav ${activeReport === 'home' ? 'active' : ''}`}
+                  >
+                    <LayoutGrid size={15} strokeWidth={1.9} /> Overview
+                  </button>
+                )}
+                {matches.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => setActiveReport(r.id)}
+                    className={`rep-nav ${activeReport === r.id ? 'active' : ''}`}
+                  >
+                    <r.icon size={15} strokeWidth={1.9} /> {r.label}
+                  </button>
+                ))}
+                {!showOverview && matches.length === 0 && (
+                  <div style={{ fontSize: '12px', color: 'var(--text-faint)', padding: '8px 12px' }}>
+                    No reports match "{navSearch}"
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </nav>
 
         {/* Quick Stats — premium card */}

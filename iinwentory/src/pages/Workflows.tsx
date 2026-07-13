@@ -5,6 +5,7 @@ import { useTeam } from '../store/useTeamStore';
 import { useAuth } from '../store/useAuthStore';
 import { useSettings } from '../store/useSettingsStore';
 import { useCurrency } from '../store/useCurrencyStore';
+import { matchItem, tagNameMap } from '../lib/itemSearch';
 import type {
   PickList, PickListStatus, PickListComment, PickListIssue, PickIssueType,
   PurchaseOrder, PurchaseOrderStatus,
@@ -940,15 +941,10 @@ function PickLists() {
                     {addErr && <div style={{ color: 'var(--danger)', fontSize: '12px', marginBottom: '8px' }}>{addErr}</div>}
                     <div style={{ maxHeight: '240px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {store.items
-                        .filter(i => {
-                          const q = addItemSearch.toLowerCase();
-                          const matches = !q
-                            || i.name.toLowerCase().includes(q)
-                            || (i.sku ?? '').toLowerCase().includes(q)
-                            || (i.location ?? '').toLowerCase().includes(q)
-                            || i.id.toLowerCase().includes(q);
-                          return matches && !selected.items.some(pi => pi.itemId === i.id);
-                        })
+                        .filter(i =>
+                          matchItem(i, addItemSearch, { tagsById: tagNameMap(store.tags) })
+                          && !selected.items.some(pi => pi.itemId === i.id)
+                        )
                         .slice(0, 25)
                         .map(it => {
                           const avail = availableFor(it.id);
@@ -1083,8 +1079,9 @@ function PurchaseOrders() {
   const [addItemSearch, setAddItemSearch] = useState('');
 
   const selected = selectedId ? wf.getPOById(selectedId) : null;
+  const searchCtx = { tagsById: tagNameMap(store.tags) };
   const filteredItems = store.items.filter(i =>
-    i.name.toLowerCase().includes(addItemSearch.toLowerCase()) &&
+    matchItem(i, addItemSearch, searchCtx) &&
     !selected?.items.some(pi => pi.itemId === i.id)
   );
 
@@ -1282,8 +1279,9 @@ function StockCounts() {
   const [addItemSearch, setAddItemSearch] = useState('');
 
   const selected = selectedId ? wf.getStockCountById(selectedId) : null;
+  const searchCtx = { tagsById: tagNameMap(store.tags) };
   const filteredItems = store.items.filter(i =>
-    i.name.toLowerCase().includes(addItemSearch.toLowerCase()) &&
+    matchItem(i, addItemSearch, searchCtx) &&
     !selected?.items.some(si => si.itemId === i.id)
   );
 

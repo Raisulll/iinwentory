@@ -2356,20 +2356,24 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.30);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: rgba(255, 255, 255, 0.92);
+  color: #111827;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
   opacity: 0;
-  transition: all 0.18s var(--ease);
+  transition: opacity 0.18s var(--ease), background 0.18s var(--ease);
 }
 
-.folder-card:hover .folder-card-menu {
+.folder-card:hover .folder-card-menu,
+.folder-card-menu[data-state="open"] {
   opacity: 1;
 }
 
 .folder-card-menu:hover {
-  background: rgba(0, 0, 0, 0.45);
+  background: #ffffff;
+  color: #000000;
 }
 
 /* Item card kebab — overlay variant (used inside premium-item-thumb) */
@@ -2382,12 +2386,62 @@ body {
   transition: opacity 0.18s var(--ease);
 }
 
-.premium-item-card:hover .premium-item-menu {
+.premium-item-card:hover .premium-item-menu,
+.premium-item-menu:has([data-state="open"]) {
   opacity: 1;
 }
 
-.premium-item-card:has(.iam-trigger[aria-expanded="true"]) .premium-item-menu {
-  opacity: 1;
+/* Folder hint chip shown on search results that live in another folder.
+   Plain CSS class so it isn't clobbered by the unlayered `button` reset. */
+.premium-item-folderhint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-tint, var(--hover-bg));
+  color: var(--text-medium);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 0.14s var(--ease), color 0.14s var(--ease), background 0.14s var(--ease);
+}
+.premium-item-folderhint span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.premium-item-folderhint:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Overlay kebab trigger — plain CSS so it beats the unlayered `button` reset
+   (Tailwind utilities live in @layer and lose to that reset). White frosted
+   pill + dark border/icon stays visible on any photo, light or dark. */
+.iam-overlay-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #111827;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  transition: background 0.18s var(--ease), color 0.18s var(--ease);
+}
+
+.iam-overlay-trigger:hover,
+.iam-overlay-trigger[data-state="open"] {
+  background: #ffffff;
+  color: #000000;
 }
 
 .premium-item-card:has(.iam-dropdown) {

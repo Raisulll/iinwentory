@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import HelpButton from '../components/HelpButton';
 import { itemInventoryValue } from '../lib/itemValue';
+import { matchItem, tagNameMap } from '../lib/itemSearch';
 
 export default function Search() {
   const store = useStore();
@@ -40,14 +41,8 @@ export default function Search() {
     let filtered = [...store.items];
 
     if (query.trim()) {
-      const q = query.toLowerCase();
-      filtered = filtered.filter(i =>
-        i.name.toLowerCase().includes(q)
-        || i.notes.toLowerCase().includes(q)
-        || i.id.toLowerCase().includes(q)
-        || (i.sku ?? '').toLowerCase().includes(q)
-        || (i.location ?? '').toLowerCase().includes(q)
-      );
+      const ctx = { tagsById: tagNameMap(store.tags) };
+      filtered = filtered.filter(i => matchItem(i, query, ctx));
     }
 
     if (selectedFolders.length > 0) {
@@ -61,7 +56,7 @@ export default function Search() {
     if (minLevelFilter === 'above') filtered = filtered.filter(i => i.minLevel !== null && i.quantity > i.minLevel);
 
     return filtered;
-  }, [query, selectedFolders, minQty, maxQty, minLevelFilter, hasSearched, store.items]);
+  }, [query, selectedFolders, minQty, maxQty, minLevelFilter, hasSearched, store.items, store.tags]);
 
   const toggleFolder = (id: string) => {
     setSelectedFolders(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);

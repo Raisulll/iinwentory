@@ -8,6 +8,7 @@ import { cacheGet, cacheSet } from '../lib/cache';
 import { getBootstrap, refetchBootstrap } from '../lib/bootstrap';
 import { subscribeTeamChanges } from '../lib/realtime';
 import { itemInventoryValue } from '../lib/itemValue';
+import { searchItems as searchItemsList, tagNameMap } from '../lib/itemSearch';
 
 interface StoreContextType {
   items: InventoryItem[];
@@ -344,15 +345,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const getFolderById = useCallback((id: string) => folders.find(f => f.id === id), [folders]);
 
   const searchItems = useCallback((query: string) => {
-    const q = query.toLowerCase();
-    return items.filter(i =>
-      i.name.toLowerCase().includes(q)
-      || i.notes.toLowerCase().includes(q)
-      || (i.sku ?? '').toLowerCase().includes(q)
-      || (i.location ?? '').toLowerCase().includes(q)
-      || i.id.toLowerCase().includes(q)
-    );
-  }, [items]);
+    const ctx = { tagsById: tagNameMap(tags) };
+    return searchItemsList(items, query, ctx);
+  }, [items, tags]);
 
   // Low stock = quantity at or below the reorder level. When no level is set
   // (min_quantity defaults to 0) this reduces to "out of stock" (quantity <= 0),

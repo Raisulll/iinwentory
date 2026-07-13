@@ -14,6 +14,7 @@ import AddFolderModal from '../components/items/AddFolderModal';
 import EditFolderModal from '../components/items/EditFolderModal';
 import MoveModal from '../components/items/MoveModal';
 import { itemInventoryValue } from '../lib/itemValue';
+import { matchItem, tagNameMap } from '../lib/itemSearch';
 import {
   Search as SearchIcon, Folder, FolderOpen,
   LayoutGrid, List, Plus, Package, ChevronRight, Trash2,
@@ -104,20 +105,36 @@ export default function Items() {
   const breadcrumbs = store.getFolderPath(currentFolderId);
   const rootFolders = store.getSubFolders(null);
 
+  const searchCtx = useMemo(() => ({ tagsById: tagNameMap(store.tags) }), [store.tags]);
+
+  // When a search is active, widen the scope from just this folder's direct
+  // children to the folder's ENTIRE subtree (every nested folder). On "All
+  // Items" (currentFolderId === null) that's the whole inventory, so items
+  // living inside folders are found too. With no query we stay scoped to the
+  // current folder so browsing is unchanged.
+  const searchScope = useMemo(() => {
+    if (!debouncedQuery.trim()) return itemsInFolder;
+    if (currentFolderId === null) return store.items;
+    const ids = new Set<string>([currentFolderId]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const f of store.folders) {
+        if (f.parentId && ids.has(f.parentId) && !ids.has(f.id)) {
+          ids.add(f.id);
+          grew = true;
+        }
+      }
+    }
+    return store.items.filter(i => i.parentId !== null && ids.has(i.parentId));
+  }, [debouncedQuery, currentFolderId, itemsInFolder, store.items, store.folders]);
+
   const filtered = useMemo(() => {
     const q = debouncedQuery.toLowerCase();
-    const matchesQuery = (i: { name: string; sku: string | null; location: string | null; notes: string; id: string }) => {
-      if (!q) return true;
-      return i.name.toLowerCase().includes(q)
-        || (i.sku ?? '').toLowerCase().includes(q)
-        || (i.location ?? '').toLowerCase().includes(q)
-        || i.notes.toLowerCase().includes(q)
-        || i.id.toLowerCase().includes(q);
-    };
     const minP = minPrice ? parseFloat(minPrice) : null;
     const maxP = maxPrice ? parseFloat(maxPrice) : null;
-    let fItems = itemsInFolder.filter(i => {
-      if (!matchesQuery(i)) return false;
+    let fItems = searchScope.filter(i => {
+      if (!matchItem(i, debouncedQuery, searchCtx)) return false;
       if (minP !== null && i.price < minP) return false;
       if (maxP !== null && i.price > maxP) return false;
       if (stockFilter === 'out' && i.quantity !== 0) return false;
@@ -140,7 +157,7 @@ export default function Items() {
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name));
     return { items: fItems, folders: fFolders };
-  }, [debouncedQuery, subFolders, itemsInFolder, sortBy, sortDir, minPrice, maxPrice, stockFilter]);
+  }, [debouncedQuery, searchCtx, searchScope, subFolders, sortBy, sortDir, minPrice, maxPrice, stockFilter]);
 
   // Scanner → "Add new" deep link: ?addWithSku=XYZ opens the Add Item modal
   // with the SKU pre-filled, then strips the param so reload doesn't re-trigger.
@@ -632,6 +649,17 @@ export default function Items() {
                       {item.sku && (
                         <div className="premium-item-sku">{item.sku}</div>
                       )}
+                      {debouncedQuery.trim() && item.parentId && item.parentId !== currentFolderId && (
+                        <button
+                          type="button"
+                          className="premium-item-folderhint"
+                          onClick={e => { e.stopPropagation(); navigate(`/items/folder/${item.parentId}`); }}
+                          title="Open folder"
+                        >
+                          <Folder size={11} strokeWidth={2} />
+                          <span>{store.getFolderById(item.parentId)?.name ?? 'Folder'}</span>
+                        </button>
+                      )}
                       <div className="premium-item-meta">
                         <div onClick={e => e.stopPropagation()}>
                           <ItemQtyControl item={item} onAdjust={() => setAdjustItemId(item.id)} />
@@ -733,11 +761,24 @@ export default function Items() {
                       <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--text-dark)', letterSpacing: '-0.010em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {item.name}
                       </div>
-                      {item.sku && (
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--text-faint)', letterSpacing: '0.02em', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.sku}
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px', overflow: 'hidden' }}>
+                        {item.sku && (
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--text-faint)', letterSpacing: '0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.sku}
+                          </span>
+                        )}
+                        {debouncedQuery.trim() && item.parentId && item.parentId !== currentFolderId && (
+                          <button
+                            type="button"
+                            className="premium-item-folderhint"
+                            onClick={e => { e.stopPropagation(); navigate(`/items/folder/${item.parentId}`); }}
+                            title="Open folder"
+                          >
+                            <Folder size={10} strokeWidth={2} />
+                            <span>{store.getFolderById(item.parentId)?.name ?? 'Folder'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <span className={`chip ${chipClass}`} style={{ justifySelf: 'start' }}>{stockLabel}</span>
                     <div onClick={e => e.stopPropagation()} style={{ display: 'flex', justifyContent: 'flex-end' }}>

@@ -85,18 +85,15 @@ export default function ItemActionMenu({
   };
 
   const triggerClass = cn(
-    'inline-flex items-center justify-center rounded-md border transition-colors',
-    'h-7 w-7',
     variant === 'inline' && [
+      'inline-flex items-center justify-center rounded-md border transition-colors h-7 w-7',
       'border-transparent bg-transparent text-muted-foreground',
       'hover:border-border hover:bg-card hover:text-foreground',
       'data-[state=open]:border-border data-[state=open]:bg-card data-[state=open]:text-foreground',
     ],
-    variant === 'overlay' && [
-      'border-white/10 bg-black/30 text-white/95 backdrop-blur-md',
-      'hover:border-white/20 hover:bg-black/50 hover:text-white',
-      'data-[state=open]:border-white/20 data-[state=open]:bg-black/50 data-[state=open]:text-white',
-    ],
+    // Overlay styling lives in a plain CSS class (.iam-overlay-trigger) so it
+    // isn't overridden by the unlayered `button` reset in index.css.
+    variant === 'overlay' && 'iam-overlay-trigger',
   );
 
   return (
