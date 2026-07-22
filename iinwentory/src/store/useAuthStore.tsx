@@ -33,6 +33,7 @@ interface AuthContextType {
   org: OrgInfo | null;
   plan: Plan;
   login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  loginWithGoogle: (credential: string) => Promise<{ ok: true; isNewUser: boolean } | { ok: false; error: string }>;
   register: (name: string, email: string, password: string, planId: PlanId, inviteCode?: string) => Promise<void>;
   logout: () => Promise<void>;
   upgradePlan: (planId: PlanId) => void;
@@ -117,6 +118,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async (
+    credential: string,
+  ): Promise<{ ok: true; isNewUser: boolean } | { ok: false; error: string }> => {
+    try {
+      const data = await apiPost<{
+        accessToken: string; refreshToken: string;
+        user: AuthUser; org: OrgInfo | null; isNewUser: boolean;
+      }>('/api/auth/google', { credential });
+
+      const planId = data.org?.planId ?? 'free';
+      setTokens(data.accessToken, data.refreshToken);
+      setSharedCookies(data.accessToken, planId);
+      setUser(data.user);
+      setOrg(data.org ?? null);
+      setPlan(getPlan(planId));
+      return { ok: true, isNewUser: data.isNewUser };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (err instanceof TypeError || /fetch|network|failed to fetch/i.test(msg)) {
+        return { ok: false, error: 'Cannot reach the server. Is the backend running on the configured URL?' };
+      }
+      return { ok: false, error: msg || 'Google sign-in failed. Please try again.' };
+    }
+  }, []);
+
   const register = useCallback(async (
     name: string, email: string, password: string, planId: PlanId, inviteCode?: string,
   ): Promise<void> => {
@@ -170,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       isLoggedIn, authLoading, user, org, plan,
-      login, register, logout, upgradePlan, refreshOrgPlan,
+      login, loginWithGoogle, register, logout, upgradePlan, refreshOrgPlan,
     }}>
       {children}
     </AuthContext.Provider>

@@ -42,6 +42,12 @@ import {
 } from './services/stripe.js';
 import { PLAN_IDS, PLANS, type PlanId } from './utils/plans.js';
 import { createClient } from '@supabase/supabase-js';
+import { OAuth2Client } from 'google-auth-library';
+
+// Google Identity Services verifier. Reused across requests. The client id is
+// the audience the incoming ID token must be minted for.
+const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+const googleClient = new OAuth2Client(googleClientId);
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '7745');
@@ -98,6 +104,7 @@ const authLimiter = rateLimit({
 // Throttle the credential- and account-sensitive endpoints specifically.
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/google', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/auth/reset-password', authLimiter);
 
@@ -571,6 +578,128 @@ app.post('/api/auth/login', async (req, res) => {
   const result = await buildAuthResponse(row.id);
   if (!result) { res.status(500).json({ error: 'No profile for user' }); return; }
   res.json(result);
+});
+
+/**
+ * Sign in / sign up with Google.
+ *
+ * The frontend uses Google Identity Services to obtain an ID token (a JWT Google
+ * signs for our client id) and POSTs it here as `credential`. We verify it
+ * against Google's public keys, then reuse the exact same account-provisioning
+ * and token-issuing path as email/password auth — so the response shape and the
+ * downstream session handling are identical.
+ *
+ * Accounts are matched by verified email: a user who first registered with a
+ * password can subsequently sign in with Google on the same email (the Google
+ * provider is appended to auth.users.raw_app_meta_data). New emails are
+ * provisioned a personal team exactly like /register.
+ */
+app.post('/api/auth/google', async (req, res) => {
+  if (!googleClientId) {
+    res.status(500).json({ error: 'Google sign-in is not configured' });
+    return;
+  }
+
+  const schema = z.object({ credential: z.string().min(1) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: 'Missing Google credential' }); return; }
+
+  // Verify the ID token: checks Google's signature, that `aud` is our client id,
+  // that `iss` is accounts.google.com, and that it hasn't expired.
+  let payload: import('google-auth-library').TokenPayload | undefined;
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: parsed.data.credential,
+      audience: googleClientId,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    res.status(401).json({ error: 'Invalid Google credential' });
+    return;
+  }
+
+  if (!payload?.email || !payload.email_verified) {
+    res.status(401).json({ error: 'Google account email is not verified' });
+    return;
+  }
+
+  const lowerEmail = payload.email.toLowerCase();
+  const name = payload.name?.trim() || lowerEmail;
+  const avatarUrl = payload.picture ?? null;
+  const googleSub = payload.sub;
+
+  const existing = await prisma.authUser.findUnique({ where: { email: lowerEmail } });
+
+  let userId: string;
+  let isNewUser = false;
+
+  if (existing) {
+    // Existing account (email/password or a prior Google sign-in) — link Google
+    // as an additional provider, idempotently, and confirm the email.
+    userId = existing.id;
+    await prisma.$executeRaw`
+      UPDATE auth.users SET
+        email_confirmed_at = COALESCE(email_confirmed_at, now()),
+        raw_app_meta_data = jsonb_set(
+          COALESCE(raw_app_meta_data, '{"provider":"email"}'::jsonb),
+          '{providers}',
+          COALESCE(raw_app_meta_data->'providers', '[]'::jsonb) || '["google"]'::jsonb
+        )
+      WHERE id = ${userId}::uuid
+        AND NOT COALESCE(raw_app_meta_data->'providers' @> '["google"]'::jsonb, false)`;
+  } else {
+    // Fresh sign-up. Mirrors /register, minus the password: a Google-only user
+    // has no encrypted_password and simply can't password-login.
+    isNewUser = true;
+    userId = crypto.randomUUID();
+
+    await prisma.authUser.create({ data: { id: userId, email: lowerEmail } });
+
+    // Same GoTrue-compatibility columns as /register (token columns forced to ''
+    // so a NULL never breaks GoTrue's string scan on the mobile app).
+    await prisma.$executeRaw`
+      UPDATE auth.users SET
+        email_confirmed_at   = now(),
+        aud                  = 'authenticated',
+        role                 = 'authenticated',
+        raw_app_meta_data    = '{"provider":"google","providers":["google"]}'::jsonb,
+        raw_user_meta_data   = jsonb_build_object(
+                                 'full_name', ${name}::text,
+                                 'avatar_url', ${avatarUrl},
+                                 'provider_id', ${googleSub}::text
+                               ),
+        confirmation_token        = COALESCE(confirmation_token, ''),
+        recovery_token            = COALESCE(recovery_token, ''),
+        email_change              = COALESCE(email_change, ''),
+        email_change_token_new    = COALESCE(email_change_token_new, ''),
+        email_change_token_current= COALESCE(email_change_token_current, '')
+      WHERE id = ${userId}::uuid`;
+
+    await prisma.profile.upsert({
+      where: { id: userId },
+      update: { fullName: name, avatarUrl: avatarUrl ?? undefined },
+      create: { id: userId, fullName: name, avatarUrl: avatarUrl ?? undefined },
+    });
+
+    const team = await prisma.team.create({
+      data: {
+        name: `${name}'s Team`,
+        createdBy: userId,
+        members: { create: { userId, role: 'owner' } },
+      },
+    });
+    await prisma.teamBilling.create({ data: { teamId: team.id, planId: 'free' } });
+    await prisma.webTeamSettings.create({ data: { teamId: team.id } });
+
+    void sendWelcomeEmail(lowerEmail, name);
+  }
+
+  // Covers accounts that exist but never got a team (e.g. created on mobile).
+  await ensureTeamMembership(userId);
+
+  const result = await buildAuthResponse(userId);
+  if (!result) { res.status(500).json({ error: 'Google sign-in failed' }); return; }
+  res.status(isNewUser ? 201 : 200).json({ ...result, isNewUser });
 });
 
 app.post('/api/auth/refresh', async (req, res) => {

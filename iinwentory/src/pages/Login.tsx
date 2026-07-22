@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../store/useAuthStore';
 import { apiPost } from '../lib/api';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 import { getPlan, PLANS, type PlanId } from '../plans';
 import {
   ArrowRight, Eye, EyeOff, Check, AlertCircle, Sparkles,
@@ -13,7 +14,7 @@ const PLAN_ORDER: PlanId[] = ['free', 'advanced', 'ultra', 'premium'];
 type LoginMode = 'login' | 'register' | 'forgot' | 'reset';
 
 export default function Login() {
-  const { login, register, isLoggedIn } = useAuth();
+  const { login, loginWithGoogle, register, isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
@@ -39,6 +40,7 @@ export default function Login() {
   const [showInviteField, setShowInviteField] = useState(presetInvite.length > 0);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
   const [resetSucceeded, setResetSucceeded] = useState(false);
 
@@ -100,6 +102,22 @@ export default function Login() {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleCredential(credential: string) {
+    setError('');
+    setSubmitting(true);
+    setGoogleLoading(true);
+    try {
+      const result = await loginWithGoogle(credential);
+      if (!result.ok) { setError(result.error); return; }
+      // New Google users go through onboarding; returning users skip to the app.
+      // Reuse the mode-based redirect effect by setting the matching mode.
+      setMode(result.isNewUser ? 'register' : 'login');
+    } finally {
+      setSubmitting(false);
+      setGoogleLoading(false);
     }
   }
 
@@ -175,6 +193,13 @@ export default function Login() {
       {/* ─────────  FORM PANEL (right)  ───────── */}
       <main className="auth-form-wrap">
         <div className="auth-form">
+          {googleLoading && (
+            <div className="auth-loading-overlay" role="status" aria-live="polite">
+              <span className="auth-loading-spinner" aria-hidden="true" />
+              <p>{mode === 'register' ? 'Creating your account…' : 'Signing you in…'}</p>
+              <span className="auth-loading-sub">Connecting with Google</span>
+            </div>
+          )}
           <div className="auth-form-header">
             <span className="auth-form-eyebrow">
               {mode === 'login'   && 'Sign in'}
@@ -204,6 +229,20 @@ export default function Login() {
                 </button>
               ))}
               <span className={`seg-tab-pill ${mode === 'register' ? 'right' : ''}`} aria-hidden="true" />
+            </div>
+          )}
+
+          {(mode === 'login' || mode === 'register') && (
+            <div className="auth-social">
+              <GoogleSignInButton
+                text={mode === 'register' ? 'signup_with' : 'signin_with'}
+                onCredential={handleGoogleCredential}
+                onError={setError}
+                disabled={submitting}
+              />
+              <div className="auth-divider">
+                <span>or {mode === 'register' ? 'sign up' : 'sign in'} with email</span>
+              </div>
             </div>
           )}
 
@@ -661,6 +700,7 @@ const authStyles = `
     background: var(--bg-color);
   }
   .auth-form {
+    position: relative;
     width: 100%;
     max-width: 440px;
     background: var(--card-bg);
@@ -668,6 +708,45 @@ const authStyles = `
     border-radius: 20px;
     padding: 36px 36px 32px;
     box-shadow: var(--shadow-lg);
+  }
+
+  /* ────────────────  GOOGLE LOADING OVERLAY  ──────────────── */
+  .auth-loading-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--card-bg) 80%, transparent);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    animation: overlayIn 0.2s var(--ease-out);
+  }
+  @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+  .auth-loading-spinner {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 3px solid var(--border-strong);
+    border-top-color: var(--primary);
+    animation: authSpin 0.7s linear infinite;
+  }
+  @keyframes authSpin { to { transform: rotate(360deg); } }
+  .auth-loading-overlay p {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--text-dark);
+    letter-spacing: -0.01em;
+  }
+  .auth-loading-sub {
+    margin-top: -8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
   }
   @media (max-width: 480px) {
     .auth-form-wrap { padding: 32px 16px; }
@@ -745,6 +824,56 @@ const authStyles = `
     z-index: 1;
   }
   .seg-tab-pill.right { transform: translateX(100%); }
+
+  /* ────────────────  SOCIAL  ──────────────── */
+  .auth-social {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 22px;
+  }
+  .google-btn-wrap {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .google-btn-host { width: 100%; display: flex; justify-content: center; }
+  .google-btn-host > div { width: 100% !important; }
+  .google-btn-skeleton {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: linear-gradient(90deg, var(--surface-tint) 25%, var(--hover-bg) 37%, var(--surface-tint) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+    border: 1px solid var(--border-strong);
+  }
+  @keyframes shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+  .auth-divider {
+    position: relative;
+    text-align: center;
+  }
+  .auth-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0; right: 0;
+    height: 1px;
+    background: var(--border-color);
+  }
+  .auth-divider span {
+    position: relative;
+    padding: 0 12px;
+    background: var(--card-bg);
+    color: var(--text-muted);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
 
   /* ────────────────  FIELDS  ──────────────── */
   .auth-fields {
