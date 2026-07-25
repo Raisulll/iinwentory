@@ -8,8 +8,6 @@ export const stripe = stripeKey ? new Stripe(stripeKey) : null;
 const PRICE_MAP: Record<string, string | undefined> = {
   advanced_monthly: process.env.STRIPE_PRICE_ADVANCED_MONTHLY,
   advanced_yearly: process.env.STRIPE_PRICE_ADVANCED_YEARLY,
-  ultra_monthly: process.env.STRIPE_PRICE_ULTRA_MONTHLY,
-  ultra_yearly: process.env.STRIPE_PRICE_ULTRA_YEARLY,
   premium_monthly: process.env.STRIPE_PRICE_PREMIUM_MONTHLY,
   premium_yearly: process.env.STRIPE_PRICE_PREMIUM_YEARLY,
 };

@@ -6,7 +6,7 @@ const testimonials = [
     company: 'BuildRight Supply Co.',
     avatar: 'SC',
     rating: 5,
-    plan: 'Ultra',
+    plan: 'Premium',
   },
   {
     quote: 'We tried three other inventory systems before iinwentory. Nothing else came close to the simplicity combined with actual power. Our team of 8 was fully onboarded in a day.',
@@ -42,7 +42,7 @@ const testimonials = [
     company: 'Horizon Equipment',
     avatar: 'LT',
     rating: 5,
-    plan: 'Ultra',
+    plan: 'Advanced',
   },
   {
     quote: 'We manage 8,000+ items across 5 locations. The Enterprise plan with dedicated support and custom integrations was exactly what we needed. Setup was seamless.',
@@ -58,7 +58,6 @@ const testimonials = [
 const planColors: Record<string, string> = {
   Free: 'bg-gray-100 text-gray-600',
   Advanced: 'bg-blue-100 text-blue-700',
-  Ultra: 'bg-primary-100 text-primary-700',
   Premium: 'bg-purple-100 text-purple-700',
   Enterprise: 'bg-gray-900 text-white',
 };

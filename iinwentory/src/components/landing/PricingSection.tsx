@@ -31,13 +31,13 @@ const plans: Plan[] = [
     cta: 'Sign Up',
     ctaHref: registerUrl(),
     features: [
-      '100 Unique Items',
+      '200 Unique Items',
       '1 User License',
-      'In-app QR Code Scanning',
+      '10 Pick Lists',
+      'In-app QR & Barcode Scanning',
       'Item Photos',
-      'Inventory Lists',
       'Low Stock Alerts',
-      '1 Month Activity History',
+      '2 Months Activity History',
       'Web & Mobile App',
     ],
   },
@@ -45,47 +45,23 @@ const plans: Plan[] = [
     id: 'advanced',
     name: 'Advanced',
     tagline: 'Best for maintaining optimal inventory levels.',
-    badge: null,
-    monthlyPrice: 49,
-    yearlyPrice: 24,
-    yearlySavings: 'Save $300',
-    yearlyBilled: 'Billed at $288/yr',
+    badge: 'Most Popular',
+    monthlyPrice: 25,
+    yearlyPrice: 15,
+    yearlySavings: 'Save $120',
+    yearlyBilled: 'Billed at $180/yr',
     cta: 'Start Free Trial',
     ctaHref: registerUrl('advanced'),
     features: [
-      '500 Unique Items',
-      '2 User Licenses',
-      'Unlimited QR Code Labels',
-      'Unlimited Barcode Scanning',
-      'Custom Fields (5)',
-      'Custom Tags & Folders',
-      'Item Check-in/Check-out',
-      '1 Year Activity History',
-      'Slack Notifications',
-    ],
-  },
-  {
-    id: 'ultra',
-    name: 'Ultra',
-    tagline: 'Best for simplifying day-to-day inventory tasks.',
-    badge: 'Most Popular',
-    monthlyPrice: 149,
-    yearlyPrice: 74,
-    yearlySavings: 'Save $900',
-    yearlyBilled: 'Billed at $888/yr',
-    cta: 'Start Free Trial',
-    ctaHref: registerUrl('ultra'),
-    features: [
-      '2,000 Unique Items',
+      '1,000 Unique Items',
       '5 User Licenses',
-      'Unlimited QR & Barcode Labels',
-      'Purchase Orders',
-      'Pick Lists',
-      'Stock Counts',
-      'Custom Fields (10)',
-      '3 Years Activity History',
-      'Slack & Microsoft Teams',
-      'Amazon Business US',
+      'Unlimited Pick Lists',
+      'Custom Fields',
+      'Top Sellers Report',
+      'Low Stock Report',
+      'Item History',
+      '24 Months Activity History',
+      'Slack Notifications',
     ],
   },
   {
@@ -93,22 +69,21 @@ const plans: Plan[] = [
     name: 'Premium',
     tagline: 'Best for streamlining inventory processes and oversight.',
     badge: null,
-    monthlyPrice: 299,
-    yearlyPrice: 149,
-    yearlySavings: 'Save $1800',
-    yearlyBilled: 'Billed at $1,788/yr',
+    monthlyPrice: 75,
+    yearlyPrice: 50,
+    yearlySavings: 'Save $300',
+    yearlyBilled: 'Billed at $600/yr',
     cta: 'Start Free Trial',
     ctaHref: registerUrl('premium'),
     features: [
+      'Everything in Advanced, plus:',
       '5,000 Unique Items',
-      '8 User Licenses',
-      'Customizable Role Permissions',
-      'QuickBooks Online Integration',
-      'Custom Fields (20)',
-      'Online Orders',
-      'Unlimited Activity History',
-      'Saved Reports & Subscriptions',
-      'Limited Access Seats',
+      '10 User Licenses (+$5/mo each extra)',
+      'Unlimited Pick Lists',
+      'Top Sellers Report',
+      'Low Stock Report',
+      'Item History',
+      '48 Months Activity History',
     ],
   },
   {
@@ -123,20 +98,19 @@ const plans: Plan[] = [
     cta: 'Talk to Sales',
     ctaHref: 'mailto:sales@iinwentory.com',
     features: [
-      '10,000+ Unique Items',
-      '12+ User Licenses',
+      'Unlimited Unique Items',
+      'Unlimited User Licenses',
       'API & Webhooks',
       'SSO Integration',
       'Dedicated Customer Success Manager',
       'Unlimited Custom Fields',
-      'Multi-account Access',
       'Custom Integrations',
       'SLA & Priority Support',
     ],
   },
 ];
 
-const planNames = ['Free', 'Advanced', 'Ultra', 'Premium', 'Enterprise'];
+const planNames = ['Free', 'Advanced', 'Premium', 'Enterprise'];
 
 type CellValue = string | boolean;
 interface CompareCategory {
@@ -144,79 +118,78 @@ interface CompareCategory {
   rows: { label: string; values: CellValue[] }[];
 }
 
+// Columns: Free · Advanced · Premium · Enterprise
 const compareCategories: CompareCategory[] = [
   {
     name: 'ORGANIZE',
     rows: [
-      { label: 'Unique Items', values: ['100', '500', '2,000', '5,000', '10,000+'] },
-      { label: 'User Licenses', values: ['1', '2', '5', '8', '12+'] },
-      { label: 'Inventory Import', values: [true, true, true, true, true] },
-      { label: 'Item Photos', values: [true, true, true, true, true] },
-      { label: 'Inventory Lists', values: [true, true, true, true, true] },
+      { label: 'Unique Items', values: ['200', '1,000', '5,000', 'Unlimited'] },
+      { label: 'User Licenses', values: ['1', '5', '10', 'Unlimited'] },
+      { label: 'Pick Lists', values: ['10', 'Unlimited', 'Unlimited', 'Unlimited'] },
+      { label: 'Inventory Import', values: [true, true, true, true] },
+      { label: 'Item Photos', values: [true, true, true, true] },
+      { label: 'Inventory Lists', values: [true, true, true, true] },
     ],
   },
   {
     name: 'CUSTOMIZE',
     rows: [
-      { label: 'Custom Fields', values: ['1', '5', '10', '20', 'Unlimited'] },
-      { label: 'Custom Folders', values: [true, true, true, true, true] },
-      { label: 'Custom Tags', values: [true, true, true, true, true] },
-      { label: 'Custom Units of Measurement', values: [false, true, true, true, true] },
-      { label: 'Customizable User Access', values: [false, false, true, true, true] },
-      { label: 'Customizable Role Permissions', values: [false, false, false, true, true] },
-      { label: 'Limited Access Seats', values: [false, true, true, true, true] },
-      { label: 'Multi-account Access (MAA)', values: [false, false, false, true, true] },
+      { label: 'Custom Fields', values: ['—', 'Unlimited', 'Unlimited', 'Unlimited'] },
+      { label: 'Custom Folders', values: [true, true, true, true] },
+      { label: 'Custom Tags', values: [true, true, true, true] },
+      { label: 'Custom Units of Measurement', values: [false, true, true, true] },
+      { label: 'Customizable User Access', values: [false, false, true, true] },
+      { label: 'Customizable Role Permissions', values: [false, false, true, true] },
+      { label: 'Limited Access Seats', values: [false, true, true, true] },
+      { label: 'Multi-account Access (MAA)', values: [false, false, true, true] },
     ],
   },
   {
     name: 'MANAGE',
     rows: [
-      { label: 'In-app Barcode & QR Code Scanning', values: [true, true, true, true, true] },
-      { label: '3rd-party Scanner Support', values: [true, true, true, true, true] },
-      { label: 'QR Code Label Creation', values: [true, true, true, true, true] },
-      { label: 'Barcode Label Creation', values: [false, true, true, true, true] },
-      { label: 'Item Check-in/Check-out', values: [false, true, true, true, true] },
-      { label: 'Purchase Orders', values: [false, false, true, true, true] },
-      { label: 'Pick Lists', values: [false, false, true, true, true] },
-      { label: 'Stock Counts', values: [false, false, true, true, true] },
-      { label: 'Online Orders', values: [false, false, false, true, true] },
+      { label: 'In-app Barcode & QR Code Scanning', values: [true, true, true, true] },
+      { label: '3rd-party Scanner Support', values: [true, true, true, true] },
+      { label: 'QR Code Label Creation', values: [true, true, true, true] },
+      { label: 'Barcode Label Creation', values: [false, true, true, true] },
+      { label: 'Item Check-in/Check-out', values: [false, true, true, true] },
+      { label: 'Purchase Orders', values: [false, false, true, true] },
+      { label: 'Stock Counts', values: [false, true, true, true] },
+      { label: 'Online Orders', values: [false, false, true, true] },
     ],
   },
   {
     name: 'TRACK AND UPDATE',
     rows: [
-      { label: 'Low Stock Alerts', values: [true, true, true, true, true] },
-      { label: 'Date-based Alerts', values: [true, true, true, true, true] },
-      { label: 'Offline Mobile Access', values: [true, true, true, true, true] },
-      { label: 'Automatic Sync', values: [true, true, true, true, true] },
-      { label: 'In-app Alerts', values: [true, true, true, true, true] },
-      { label: 'Email Alerts', values: [true, true, true, true, true] },
+      { label: 'Low Stock Alerts', values: [true, true, true, true] },
+      { label: 'Date-based Alerts', values: [true, true, true, true] },
+      { label: 'Offline Mobile Access', values: [true, true, true, true] },
+      { label: 'Automatic Sync', values: [true, true, true, true] },
+      { label: 'In-app Alerts', values: [true, true, true, true] },
+      { label: 'Email Alerts', values: [true, true, true, true] },
     ],
   },
   {
     name: 'REPORT',
     rows: [
-      { label: 'Activity History', values: ['1 month', '1 year', '3 years', 'Unlimited', 'Unlimited'] },
-      { label: 'Transaction Reports', values: ['1-month limit', '1-year limit', '3-year limit', 'Unlimited', 'Unlimited'] },
-      { label: 'Activity History Reports', values: [true, true, true, true, true] },
-      { label: 'Inventory Summary Reports', values: [true, true, true, true, true] },
-      { label: 'Low Stock Reports', values: [true, true, true, true, true] },
-      { label: 'Move Summary Reports', values: [false, true, true, true, true] },
-      { label: 'Item Flow Reports', values: [false, true, true, true, true] },
-      { label: 'Saved Reports', values: [false, false, true, true, true] },
-      { label: 'Report Subscriptions', values: [false, false, true, true, true] },
+      { label: 'Activity History', values: ['2 months', '24 months', '48 months', 'Unlimited'] },
+      { label: 'Transaction Reports', values: ['2-month limit', '24-month limit', '48-month limit', 'Unlimited'] },
+      { label: 'Top Sellers Report', values: [false, true, true, true] },
+      { label: 'Low Stock Reports', values: [false, true, true, true] },
+      { label: 'Item History', values: [false, true, true, true] },
+      { label: 'Inventory Summary Reports', values: [false, true, true, true] },
+      { label: 'Saved Reports', values: [false, false, true, true] },
+      { label: 'Report Subscriptions', values: [false, false, true, true] },
     ],
   },
   {
     name: 'INTEGRATIONS',
     rows: [
-      { label: 'Slack', values: [false, true, true, true, true] },
-      { label: 'Microsoft Teams', values: [false, false, true, true, true] },
-      { label: 'Amazon Business US', values: [false, false, true, true, true] },
-      { label: 'QuickBooks Online', values: [false, false, false, true, true] },
-      { label: 'Webhooks', values: [false, false, false, false, true] },
-      { label: 'API', values: [false, false, false, false, true] },
-      { label: 'SSO', values: [false, false, false, false, true] },
+      { label: 'Slack', values: [false, true, true, true] },
+      { label: 'Microsoft Teams', values: [false, false, true, true] },
+      { label: 'QuickBooks Online', values: [false, false, true, true] },
+      { label: 'Webhooks', values: [false, false, false, true] },
+      { label: 'API', values: [false, false, false, true] },
+      { label: 'SSO', values: [false, false, false, true] },
     ],
   },
 ];
@@ -272,7 +245,7 @@ export default function PricingSection() {
           {/* Billing toggle */}
           <div className="mt-8 relative inline-block">
             <span className="pointer-events-none absolute -top-3 left-[28%] -translate-x-1/2 z-20 rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-md shadow-emerald-500/40 ring-2 ring-bg">
-              Save 50%
+              Save 40%
             </span>
             <div className="relative inline-flex items-center rounded-2xl bg-white border border-gray-200 p-1.5 shadow-sm">
               <span
@@ -307,25 +280,25 @@ export default function PricingSection() {
 
           {billing === 'yearly' && (
             <p className="mt-3 text-xs text-gray-400">
-              * 50% discount applies only to first year of new customer subscriptions. After the first year, a 20% discount applies to all yearly plans.
+              * Yearly plans are billed once per year — up to 40% cheaper than paying monthly. Cancel anytime.
             </p>
           )}
         </div>
 
         {/* Pricing cards */}
-        <div className="mt-16 grid gap-6 lg:grid-cols-5">
+        <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {plans.map((plan, i) => {
-            const isUltra = plan.id === 'ultra';
+            const isFeatured = plan.id === 'advanced';
             return (
               <div
                 key={plan.id}
                 className={`relative flex flex-col rounded-3xl border transition-all duration-300 reveal reveal-delay-${i + 1} ${
-                  isUltra
+                  isFeatured
                     ? 'border-primary-400 bg-gradient-to-br from-primary-600 to-primary-700 text-white shadow-2xl shadow-primary-300/40 -mt-4 lg:scale-105 ring-1 ring-primary-400/50'
                     : 'border-gray-200 bg-white shadow-card hover:shadow-card-hover hover:-translate-y-1'
                 }`}
               >
-                {isUltra && (
+                {isFeatured && (
                   <div
                     aria-hidden="true"
                     className="halo-pulse pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] blur-2xl"
@@ -342,8 +315,8 @@ export default function PricingSection() {
 
                 <div className="flex flex-1 flex-col p-6">
                   <div>
-                    <h3 className={`text-lg font-bold ${isUltra ? 'text-white' : 'text-gray-900'}`}>{plan.name}</h3>
-                    <p className={`mt-1 text-xs ${isUltra ? 'text-white/70' : 'text-gray-500'}`}>{plan.tagline}</p>
+                    <h3 className={`text-lg font-bold ${isFeatured ? 'text-white' : 'text-gray-900'}`}>{plan.name}</h3>
+                    <p className={`mt-1 text-xs ${isFeatured ? 'text-white/70' : 'text-gray-500'}`}>{plan.tagline}</p>
                   </div>
 
                   {/* Price */}
@@ -351,17 +324,17 @@ export default function PricingSection() {
                     {plan.monthlyPrice !== null ? (
                       <>
                         <div className="relative flex items-end gap-1 h-12">
-                          <span className={`text-4xl font-extrabold tabular-nums ${isUltra ? 'text-white' : 'text-gray-900'}`}>
+                          <span className={`text-4xl font-extrabold tabular-nums ${isFeatured ? 'text-white' : 'text-gray-900'}`}>
                             ${displayPrice(plan)}
                           </span>
-                          <span className={`mb-1 text-sm ${isUltra ? 'text-white/70' : 'text-gray-500'}`}>USD/mo</span>
+                          <span className={`mb-1 text-sm ${isFeatured ? 'text-white/70' : 'text-gray-500'}`}>USD/mo</span>
                         </div>
                         {billing === 'yearly' && plan.yearlySavings && (
                           <div className="mt-1">
-                            <span className={`text-xs font-semibold ${isUltra ? 'text-emerald-300' : 'text-emerald-600'}`}>
+                            <span className={`text-xs font-semibold ${isFeatured ? 'text-emerald-300' : 'text-emerald-600'}`}>
                               {plan.yearlySavings}!
                             </span>
-                            <span className={`ml-1 text-xs ${isUltra ? 'text-white/60' : 'text-gray-400'}`}>
+                            <span className={`ml-1 text-xs ${isFeatured ? 'text-white/60' : 'text-gray-400'}`}>
                               {plan.yearlyBilled}.
                             </span>
                           </div>
@@ -369,8 +342,8 @@ export default function PricingSection() {
                       </>
                     ) : (
                       <>
-                        <div className={`text-2xl font-bold ${isUltra ? 'text-white' : 'text-gray-900'}`}>Get a Quote</div>
-                        <div className={`mt-1 text-xs ${isUltra ? 'text-white/70' : 'text-gray-500'}`}>Custom pricing for large teams</div>
+                        <div className={`text-2xl font-bold ${isFeatured ? 'text-white' : 'text-gray-900'}`}>Get a Quote</div>
+                        <div className={`mt-1 text-xs ${isFeatured ? 'text-white/70' : 'text-gray-500'}`}>Custom pricing for large teams</div>
                       </>
                     )}
                   </div>
@@ -379,7 +352,7 @@ export default function PricingSection() {
                   <CtaLink
                     href={hrefFor(plan)}
                     className={`mt-6 block rounded-xl px-4 py-3 text-center text-sm font-bold transition-all duration-200 ${
-                      isUltra
+                      isFeatured
                         ? 'bg-white text-primary-700 hover:bg-white/90 shadow-lg'
                         : 'border border-primary-600 text-primary-600 hover:bg-primary-600 hover:text-white'
                     }`}
@@ -390,8 +363,8 @@ export default function PricingSection() {
                   {/* Features */}
                   <ul className="mt-6 flex-1 space-y-2.5">
                     {plan.features.map((feature) => (
-                      <li key={feature} className={`flex items-start gap-2.5 text-sm ${isUltra ? 'text-white/85' : 'text-gray-600'}`}>
-                        <CheckIcon className={`mt-0.5 size-4 shrink-0 ${isUltra ? 'text-emerald-300' : 'text-emerald-500'}`} />
+                      <li key={feature} className={`flex items-start gap-2.5 text-sm ${isFeatured ? 'text-white/85' : 'text-gray-600'}`}>
+                        <CheckIcon className={`mt-0.5 size-4 shrink-0 ${isFeatured ? 'text-emerald-300' : 'text-emerald-500'}`} />
                         {feature}
                       </li>
                     ))}
@@ -424,7 +397,7 @@ export default function PricingSection() {
                 <tr className="border-b border-gray-100">
                   <th className="py-4 pl-6 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 w-48">Feature</th>
                   {planNames.map((name) => (
-                    <th key={name} className={`px-4 py-4 text-center text-xs font-bold ${name === 'Ultra' ? 'text-primary-600 bg-primary-50' : 'text-gray-700'}`}>
+                    <th key={name} className={`px-4 py-4 text-center text-xs font-bold ${name === 'Advanced' ? 'text-primary-600 bg-primary-50' : 'text-gray-700'}`}>
                       {name}
                     </th>
                   ))}
@@ -434,7 +407,7 @@ export default function PricingSection() {
                 {compareCategories.map((cat) => (
                   <Fragment key={cat.name}>
                     <tr>
-                      <td colSpan={6} className="bg-gray-50 px-6 py-2.5">
+                      <td colSpan={5} className="bg-gray-50 px-6 py-2.5">
                         <span className="text-xs font-bold uppercase tracking-wider text-gray-400">{cat.name}</span>
                       </td>
                     </tr>
@@ -442,7 +415,7 @@ export default function PricingSection() {
                       <tr key={row.label} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
                         <td className="py-3 pl-6 pr-4 text-gray-600">{row.label}</td>
                         {row.values.map((val, idx) => (
-                          <td key={idx} className={`px-4 py-3 text-center ${idx === 2 ? 'bg-primary-50/50' : ''}`}>
+                          <td key={idx} className={`px-4 py-3 text-center ${idx === 1 ? 'bg-primary-50/50' : ''}`}>
                             {typeof val === 'boolean' ? (
                               val ? (
                                 <CheckIcon className="mx-auto size-4 text-emerald-500" />
@@ -465,11 +438,11 @@ export default function PricingSection() {
                 <tr className="border-t-2 border-gray-100">
                   <td className="py-4 pl-6" />
                   {plans.map((plan, idx) => (
-                    <td key={plan.id} className={`px-3 py-4 text-center ${idx === 2 ? 'bg-primary-50/50' : ''}`}>
+                    <td key={plan.id} className={`px-3 py-4 text-center ${idx === 1 ? 'bg-primary-50/50' : ''}`}>
                       <CtaLink
                         href={hrefFor(plan)}
                         className={`inline-block rounded-xl px-3 py-2 text-xs font-bold transition-all ${
-                          plan.id === 'ultra' ? 'bg-primary-600 text-white hover:bg-primary-700' : 'border border-primary-500 text-primary-600 hover:bg-primary-50'
+                          plan.id === 'advanced' ? 'bg-primary-600 text-white hover:bg-primary-700' : 'border border-primary-500 text-primary-600 hover:bg-primary-50'
                         }`}
                       >
                         {plan.cta}

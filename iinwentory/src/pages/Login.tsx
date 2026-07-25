@@ -9,7 +9,7 @@ import {
   ShieldCheck, Boxes, ScanLine, Layers,
 } from 'lucide-react';
 
-const PLAN_ORDER: PlanId[] = ['free', 'advanced', 'ultra', 'premium'];
+const PLAN_ORDER: PlanId[] = ['free', 'advanced', 'premium'];
 
 type LoginMode = 'login' | 'register' | 'forgot' | 'reset';
 

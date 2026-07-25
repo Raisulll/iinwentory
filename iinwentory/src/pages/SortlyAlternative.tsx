@@ -38,25 +38,39 @@ interface Row {
   them: Cell;
 }
 
-// Genuine iinwentory advantages. VERIFY the `them: false` rows against Sortly.
+// Where iinwentory wins — all price/access facts, verified against sortly.com
+// (Sortly Advanced $24/mo & Ultra $74/mo billed yearly; free tier 100 items;
+// pick lists gated to Ultra; 14-day trial requires a credit card).
 const STANDOUT: Row[] = [
   {
-    feature: 'Dedicated pick & fulfilment mode',
-    detail: 'Turn stock into order pick lists your team checks off item by item.',
+    feature: 'Entry paid plan',
+    detail: 'iinwentory Advanced vs Sortly Advanced, billed yearly.',
+    us: `$${PLANS.advanced.yearlyPrice}/mo`,
+    them: '$24/mo',
+  },
+  {
+    feature: 'Next tier up',
+    detail: 'iinwentory Premium vs Sortly Ultra, billed yearly.',
+    us: `$${PLANS.premium.yearlyPrice}/mo`,
+    them: '$74/mo',
+  },
+  {
+    feature: 'Items on the free plan',
+    detail: 'Twice the free headroom to get started.',
+    us: `${PLANS.free.maxItems}`,
+    them: '100',
+  },
+  {
+    feature: 'Free trial without a credit card',
+    detail: 'Sortly requires a card and auto-charges when the trial ends.',
     us: true,
     them: false,
   },
   {
-    feature: 'Custom workflows',
-    detail: 'Model your own multi-step processes instead of fixed screens.',
+    feature: 'Unlimited pick lists from the entry plan',
+    detail: 'Sortly reserves pick lists for its $74/mo Ultra tier.',
     us: true,
-    them: false,
-  },
-  {
-    feature: '50% discount in your first year',
-    detail: 'On annual billing — then transparent renewal pricing.',
-    us: true,
-    them: '—',
+    them: 'Ultra only',
   },
 ];
 
@@ -72,11 +86,10 @@ const PARITY: Row[] = [
     them: true,
   },
   { feature: 'Generate QR & barcode labels', us: true, them: true },
+  { feature: 'Pick lists & fulfilment', us: true, them: true },
   { feature: 'Custom fields', us: true, them: true },
-  { feature: 'Search across every folder', us: true, them: true },
   { feature: 'Team roles & permissions', us: true, them: true },
   { feature: 'Activity history & reports', us: true, them: true },
-  { feature: 'Free plan to start', us: true, them: true },
 ];
 
 // Plan-level value comparison. iinwentory numbers come straight from plans.ts;
@@ -86,48 +99,48 @@ const PRICING = [
     tier: 'Free',
     us: {
       price: '$0',
-      line: `${PLANS.free.maxItems} items · ${PLANS.free.maxUsers} user · barcode scanning`,
+      line: `${PLANS.free.maxItems} items · ${PLANS.free.maxUsers} user · pick lists & scanning`,
     },
-    them: 'Free tier with entry & scanning limits',
+    them: '100 items · 1 user',
   },
   {
-    tier: 'Growing team',
+    tier: 'Advanced',
     us: {
       price: `$${PLANS.advanced.yearlyPrice}/mo`,
-      line: `${PLANS.advanced.maxItems} items · ${PLANS.advanced.maxUsers} users · billed yearly`,
+      line: `${PLANS.advanced.maxItems.toLocaleString()} items · ${PLANS.advanced.maxUsers} users · billed yearly`,
     },
-    them: 'Advanced tier, typically ~$49/mo',
+    them: '$24/mo · 500 items · 2 users',
   },
   {
-    tier: 'Scaling business',
+    tier: 'Premium',
     us: {
-      price: `$${PLANS.ultra.yearlyPrice}/mo`,
-      line: `${PLANS.ultra.maxItems.toLocaleString()} items · ${PLANS.ultra.maxUsers} users · billed yearly`,
+      price: `$${PLANS.premium.yearlyPrice}/mo`,
+      line: `${PLANS.premium.maxItems.toLocaleString()} items · ${PLANS.premium.maxUsers} users · billed yearly`,
     },
-    them: 'Ultra tier, typically ~$149/mo',
+    them: 'Ultra: $74/mo · 2,000 items · 5 users',
   },
 ];
 
 const REASONS = [
   {
-    title: 'Built for picking, not just counting',
-    body: 'A dedicated Pick Mode turns your inventory into order-fulfilment pick lists your team works through item by item — so dispatch and warehousing aren’t bolted-on afterthoughts.',
-    icon: (
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    ),
-  },
-  {
-    title: 'Workflows that match how you work',
-    body: 'Model your own multi-step processes with custom workflows instead of forcing your operation into fixed screens. Add the fields, tags and steps your business actually uses.',
-    icon: (
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-    ),
-  },
-  {
-    title: 'Honest, transparent pricing',
-    body: 'A genuinely usable free plan, clear tiers, and a 50% discount in your first year on annual billing. Start a 14-day trial with no credit card and no sales call.',
+    title: 'Up to half the price of Sortly',
+    body: `Advanced is $${PLANS.advanced.yearlyPrice}/mo billed yearly ($${PLANS.advanced.monthlyPrice} monthly) against Sortly's $24/$49, and Premium is $${PLANS.premium.yearlyPrice}/mo ($${PLANS.premium.monthlyPrice} monthly) against Sortly's Ultra at $74/$149 — comparable capability for a lot less every month.`,
     icon: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    ),
+  },
+  {
+    title: 'Start free — no credit card',
+    body: 'Try any plan free for 14 days without entering a card. Sortly asks for a credit card up front and auto-charges you when the trial ends. Here, you only pay when you decide to.',
+    icon: (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M2.25 8.25h19.5M2.25 9V6.75A2.25 2.25 0 014.5 4.5h15a2.25 2.25 0 012.25 2.25v10.5A2.25 2.25 0 0119.5 19.5h-15a2.25 2.25 0 01-2.25-2.25V9z" />
+    ),
+  },
+  {
+    title: 'A free plan that does real work',
+    body: `${PLANS.free.maxItems} items — twice Sortly's 100 — plus pick lists, barcode and QR scanning, item photos and the mobile app, all at $0. Upgrade only when you actually outgrow it.`,
+    icon: (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12M4.5 7.5h15a.75.75 0 01.75.75v2.25a.75.75 0 01-.75.75h-15a.75.75 0 01-.75-.75V8.25a.75.75 0 01.75-.75z" />
     ),
   },
   {
@@ -160,7 +173,7 @@ const STEPS = [
 const FAQS = [
   {
     q: 'What is the best Sortly alternative?',
-    a: 'iinwentory is a modern, full-featured Sortly alternative built for the same job — folder-based inventory with photos, custom fields and barcode/QR scanning — while adding a dedicated pick-and-fulfilment mode and custom workflows. It runs on web and mobile with transparent pricing and a genuinely free plan.',
+    a: `iinwentory is a modern, full-featured Sortly alternative built for the same job — folder-based inventory with photos, custom fields, barcode/QR scanning and pick lists — for up to half the price. It runs on web and mobile, starts free with no credit card, and gives you ${PLANS.free.maxItems} items on the free plan (twice Sortly's 100).`,
   },
   {
     q: 'Is there a free Sortly alternative?',
@@ -172,7 +185,7 @@ const FAQS = [
   },
   {
     q: 'Is iinwentory cheaper than Sortly?',
-    a: 'iinwentory’s tiers are priced competitively with Sortly’s, and annual billing includes a 50% discount in your first year. There’s also a genuinely usable free plan and a 14-day trial with no credit card, so you can compare the value on your own inventory before paying anything. (Compare current pricing on both sites — plans change.)',
+    a: `Yes. Billed yearly, iinwentory Advanced is $${PLANS.advanced.yearlyPrice}/mo versus Sortly Advanced at $24/mo, and iinwentory Premium is $${PLANS.premium.yearlyPrice}/mo versus Sortly Ultra at $74/mo. On monthly billing it's $${PLANS.advanced.monthlyPrice}/$${PLANS.premium.monthlyPrice} versus Sortly's $49/$149. You also get a free plan and a 14-day trial with no credit card, so you can compare on your own inventory before paying anything.`,
   },
   {
     q: 'Can I use iinwentory on my phone?',
@@ -207,7 +220,7 @@ function CellMark({ value }: { value: Cell }) {
   if (value === 'partial') {
     return <span className="text-sm font-medium text-amber-600">Limited</span>;
   }
-  return <span className="text-base font-medium text-gray-300">{value}</span>;
+  return <span className="text-sm font-semibold text-gray-700">{value}</span>;
 }
 
 /** A comparison table body row. iinwentory column carries a persistent tint. */
@@ -252,9 +265,9 @@ export default function SortlyAlternative() {
   // data for rich results. Everything is restored on unmount so navigating back
   // to the app doesn't leak this page's tags.
   useEffect(() => {
-    const title = 'Best Sortly Alternative (2026) — iinwentory vs Sortly Compared';
+    const title = 'Best Sortly Alternative (2026) — Up to Half the Price | iinwentory';
     const description =
-      'Looking for a Sortly alternative? Compare iinwentory vs Sortly on features and pricing — dedicated pick mode, custom workflows, a free plan and easy migration. No credit card.';
+      "Looking for a Sortly alternative? iinwentory matches Sortly's features for up to half the price — from $15/mo, a free plan with 200 items, and a 14-day trial with no credit card.";
     const canonicalHref = 'https://iinwentory.com/sortly-alternative';
 
     const prevTitle = document.title;
@@ -335,15 +348,15 @@ export default function SortlyAlternative() {
             </div>
 
             <h1 className="font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl reveal reveal-delay-1">
-              The Sortly alternative your
+              The Sortly alternative at
               <br className="hidden sm:block" />{' '}
-              team will <span className="font-accent font-semibold text-gradient-white">actually stick with</span>
+              <span className="font-accent font-semibold text-gradient-white">up to half the price</span>
             </h1>
 
             <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80 leading-relaxed reveal reveal-delay-2">
-              Everything you rely on in Sortly — folders, photos, custom fields and barcode scanning —
-              plus a dedicated pick-and-fulfilment mode and custom workflows, on web and mobile. Import
-              your data and switch in an afternoon.
+              Everything you rely on in Sortly — folders, photos, custom fields, barcode scanning and pick
+              lists — from ${PLANS.advanced.yearlyPrice}/month instead of $24. Start free with no credit card,
+              import your data, and switch in an afternoon.
             </p>
 
             <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center reveal reveal-delay-3">
@@ -365,7 +378,7 @@ export default function SortlyAlternative() {
             </div>
 
             <div className="mt-10 flex flex-wrap justify-center gap-3 reveal reveal-delay-4">
-              {['✓ Free plan', '✓ Import from Sortly', '✓ Web & mobile app', '✓ 14-day trial'].map((pill) => (
+              {[`✓ From $${PLANS.advanced.yearlyPrice}/mo`, '✓ No credit card', `✓ ${PLANS.free.maxItems} free items`, '✓ Import from Sortly'].map((pill) => (
                 <div key={pill} className="rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/80">
                   {pill}
                 </div>
@@ -412,7 +425,7 @@ export default function SortlyAlternative() {
                     </tr>
                   </thead>
                   <tbody>
-                    <GroupRow label="Where iinwentory pulls ahead" />
+                    <GroupRow label="Where iinwentory wins" />
                     {STANDOUT.map((row) => (
                       <CompareRow key={row.feature} row={row} />
                     ))}
@@ -488,11 +501,11 @@ export default function SortlyAlternative() {
                 Pricing
               </div>
               <h2 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
-                Comparable power, transparent pricing
+                Same tiers, up to half the price
               </h2>
               <p className="mx-auto mt-5 max-w-2xl text-lg text-gray-500">
-                iinwentory&rsquo;s plans line up with Sortly&rsquo;s tiers — with a 50% first-year discount on annual
-                billing and a free plan you can actually run on.
+                iinwentory&rsquo;s plans line up with Sortly&rsquo;s tiers — for less every month, with a free plan
+                you can actually run on and no credit card to start.
               </p>
             </div>
 

@@ -10,7 +10,7 @@ describe('plans', () => {
   });
 
   it('has monotonically non-decreasing item limits up the tiers', () => {
-    const order: PlanId[] = ['free', 'advanced', 'ultra', 'premium', 'enterprise'];
+    const order: PlanId[] = ['free', 'advanced', 'premium', 'enterprise'];
     for (let i = 1; i < order.length; i++) {
       expect(PLANS[order[i]].maxItems).toBeGreaterThanOrEqual(PLANS[order[i - 1]].maxItems);
       expect(PLANS[order[i]].maxUsers).toBeGreaterThanOrEqual(PLANS[order[i - 1]].maxUsers);
@@ -31,7 +31,7 @@ describe('plans', () => {
 
   describe('getPlan', () => {
     it('returns the matching plan for a known id', () => {
-      expect(getPlan('ultra').id).toBe('ultra');
+      expect(getPlan('premium').id).toBe('premium');
     });
 
     it('falls back to free for unknown, null, or undefined ids', () => {

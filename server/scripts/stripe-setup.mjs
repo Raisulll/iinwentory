@@ -26,11 +26,12 @@ const webhookUrl = process.env.WEBHOOK_URL || 'https://server-pi-five-91.vercel.
 
 const stripe = new Stripe(secretKey);
 
-// Plan definitions — kept in sync with iinwentory/src/plans.ts and PricingSection.vue
+// Plan definitions — kept in sync with iinwentory/src/plans.ts and PricingSection.tsx.
+// `yearly` is the total charged once per year (per-month price * 12): Advanced
+// $15/mo -> $180/yr; Premium $50/mo -> $600/yr. Amounts are in cents.
 const PLANS = [
-  { key: 'advanced', name: 'Advanced', monthly: 4900, yearly: 28800 },
-  { key: 'ultra',    name: 'Ultra',    monthly: 14900, yearly: 88800 },
-  { key: 'premium',  name: 'Premium',  monthly: 29900, yearly: 178800 },
+  { key: 'advanced', name: 'Advanced', monthly: 2500, yearly: 18000 },
+  { key: 'premium',  name: 'Premium',  monthly: 7500, yearly: 60000 },
 ];
 
 async function findOrCreateProduct(plan) {

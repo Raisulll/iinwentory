@@ -25,7 +25,7 @@ interface BillingResponse {
   summary: { total: number; drift: number; byStatus: Record<string, number> };
 }
 
-const PLAN_OPTIONS: PlanId[] = ['free', 'advanced', 'ultra', 'premium', 'enterprise'];
+const PLAN_OPTIONS: PlanId[] = ['free', 'advanced', 'premium', 'enterprise'];
 
 const statusColors: Record<string, string> = {
   active: '#059669',

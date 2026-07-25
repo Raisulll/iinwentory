@@ -44,7 +44,7 @@ const USAGE_OPTIONS: ReadonlyArray<{ id: string; label: string; desc: string; ic
   { id: 'exploring',      label: 'Just exploring',         desc: 'No pressure — kick the tyres.',                 icon: Compass },
 ];
 
-const PLAN_ORDER: PlanId[] = ['free', 'advanced', 'ultra', 'premium'];
+const PLAN_ORDER: PlanId[] = ['free', 'advanced', 'premium'];
 
 interface PlanState { planId: PlanId; inviteCode?: string }
 
@@ -281,11 +281,11 @@ export default function Onboarding() {
                     <button
                       key={pid}
                       type="button"
-                      className={`ob-plan-card${active ? ' is-active' : ''}${pid === 'ultra' ? ' is-popular' : ''}`}
+                      className={`ob-plan-card${active ? ' is-active' : ''}${pid === 'advanced' ? ' is-popular' : ''}`}
                       onClick={() => setData(d => ({ ...d, planId: pid }))}
                       style={{ '--plan-color': p.color } as React.CSSProperties}
                     >
-                      {pid === 'ultra' && <span className="ob-plan-badge">Most popular</span>}
+                      {pid === 'advanced' && <span className="ob-plan-badge">Most popular</span>}
                       <div className="ob-plan-head">
                         <span className="ob-plan-dot" />
                         <span className="ob-plan-name">{p.name}</span>

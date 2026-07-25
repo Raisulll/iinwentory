@@ -2496,7 +2496,7 @@ app.post('/api/billing/checkout', requireAuth, async (req, res) => {
   if (!stripe) { res.status(503).json({ error: 'Stripe not configured' }); return; }
 
   const schema = z.object({
-    planId: z.enum(['advanced', 'ultra', 'premium']),
+    planId: z.enum(['advanced', 'premium']),
     billing: z.enum(['monthly', 'yearly']),
   });
   const parsed = schema.safeParse(req.body);

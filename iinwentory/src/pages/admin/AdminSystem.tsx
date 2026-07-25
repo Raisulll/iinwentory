@@ -24,7 +24,7 @@ interface AnnouncementRow {
   createdAt: string;
 }
 
-const PLAN_ORDER: PlanId[] = ['free', 'advanced', 'ultra', 'premium', 'enterprise'];
+const PLAN_ORDER: PlanId[] = ['free', 'advanced', 'premium', 'enterprise'];
 const cap = (n: number) => (n === Infinity ? '∞' : n.toLocaleString());
 const fmtUptime = (s: number) => {
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);

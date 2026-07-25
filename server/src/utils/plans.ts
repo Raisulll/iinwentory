@@ -2,9 +2,9 @@
 // previous Prisma `PlanId` enum is gone (Supabase dump uses text + CHECK
 // constraints rather than native enums for app-level enums).
 
-export type PlanId = 'free' | 'advanced' | 'ultra' | 'premium' | 'enterprise';
+export type PlanId = 'free' | 'advanced' | 'premium' | 'enterprise';
 
-export const PLAN_IDS: readonly PlanId[] = ['free', 'advanced', 'ultra', 'premium', 'enterprise'] as const;
+export const PLAN_IDS: readonly PlanId[] = ['free', 'advanced', 'premium', 'enterprise'] as const;
 
 export interface PlanLimits {
   id: PlanId;
@@ -21,42 +21,32 @@ export const PLANS: Record<PlanId, PlanLimits> = {
   free: {
     id: 'free',
     name: 'Free',
-    maxItems: 100,
+    maxItems: 200,
     maxUsers: 1,
-    customFields: 1,
-    activityHistoryMonths: 1,
+    customFields: 0,
+    activityHistoryMonths: 2,
     monthlyPrice: 0,
     yearlyPrice: 0,
   },
   advanced: {
     id: 'advanced',
     name: 'Advanced',
-    maxItems: 500,
-    maxUsers: 2,
-    customFields: 5,
-    activityHistoryMonths: 12,
-    monthlyPrice: 49,
-    yearlyPrice: 24,
-  },
-  ultra: {
-    id: 'ultra',
-    name: 'Ultra',
-    maxItems: 2000,
+    maxItems: 1000,
     maxUsers: 5,
-    customFields: 10,
-    activityHistoryMonths: 36,
-    monthlyPrice: 149,
-    yearlyPrice: 74,
+    customFields: Infinity,
+    activityHistoryMonths: 24,
+    monthlyPrice: 25,
+    yearlyPrice: 15,
   },
   premium: {
     id: 'premium',
     name: 'Premium',
     maxItems: 5000,
-    maxUsers: 8,
-    customFields: 20,
-    activityHistoryMonths: Infinity,
-    monthlyPrice: 299,
-    yearlyPrice: 149,
+    maxUsers: 10,
+    customFields: Infinity,
+    activityHistoryMonths: 48,
+    monthlyPrice: 75,
+    yearlyPrice: 50,
   },
   enterprise: {
     id: 'enterprise',

@@ -80,7 +80,7 @@ export default function Settings() {
     // → auto-launch Stripe checkout the moment the user lands on this page.
     const upgrade = params.get('upgrade');
     const cycle = params.get('cycle');
-    const validPlans = ['advanced', 'ultra', 'premium'] as const;
+    const validPlans = ['advanced', 'premium'] as const;
     const validCycles = ['monthly', 'yearly'] as const;
     if (
       upgrade &&
@@ -545,9 +545,9 @@ export default function Settings() {
               {(() => {
                 // Rank order — anything below the user's current paid tier is a downgrade
                 // and must be routed through Stripe's portal, not the checkout endpoint.
-                const RANK: Record<string, number> = { free: 0, advanced: 1, ultra: 2, premium: 3, enterprise: 4 };
+                const RANK: Record<string, number> = { free: 0, advanced: 1, premium: 2, enterprise: 3 };
                 const currentRank = RANK[plan.id] ?? 0;
-                return (['advanced', 'ultra', 'premium'] as const).map(planId => {
+                return (['advanced', 'premium'] as const).map(planId => {
                   const p = PLANS[planId];
                   const isCurrent = plan.id === planId;
                   const isLower = !isCurrent && RANK[planId] < currentRank;
@@ -600,7 +600,7 @@ export default function Settings() {
                       <ul style={{ fontSize: '12px', color: 'var(--text-medium)', marginTop: '12px', paddingLeft: '18px', lineHeight: '1.7' }}>
                         <li>{p.maxItems} items</li>
                         <li>{p.maxUsers} users</li>
-                        <li>{p.customFields} custom fields</li>
+                        <li>{p.customFields === Infinity ? 'Unlimited' : p.customFields} custom fields</li>
                         <li>
                           {p.activityHistoryMonths === Infinity
                             ? 'Unlimited history'
