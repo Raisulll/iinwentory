@@ -23,7 +23,7 @@ const features = [
   {
     icon: '🏷️',
     title: 'QR & Barcode Labels',
-    description: 'Generate professional QR code and barcode labels to print and attach to your items. Scan with any device, even offline.',
+    description: 'Generate professional QR code and barcode labels to print and attach to your items. Scan them with your device camera or a Bluetooth/USB scanner.',
     color: 'from-orange-500 to-red-500',
     highlights: ['QR code generation', 'Barcode scanning', 'Bulk label printing'],
   },
@@ -36,10 +36,10 @@ const features = [
   },
   {
     icon: '📱',
-    title: 'Mobile-First & Offline',
-    description: 'Use iinwentory on any device. The progressive web app works fully offline and syncs automatically when back online.',
+    title: 'Web & Mobile Apps',
+    description: 'Manage everything from a full web app on desktop, or use the native mobile app to scan and update stock on the go — offline, right on the warehouse floor.',
     color: 'from-pink-500 to-rose-600',
-    highlights: ['Works offline', 'Auto sync', 'Native-like PWA'],
+    highlights: ['Full web app', 'Native mobile app', 'Offline on mobile'],
   },
   {
     icon: '👥',

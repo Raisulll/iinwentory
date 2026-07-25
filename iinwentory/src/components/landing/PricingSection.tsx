@@ -38,7 +38,7 @@ const plans: Plan[] = [
       'Inventory Lists',
       'Low Stock Alerts',
       '1 Month Activity History',
-      'Mobile App (PWA)',
+      'Web & Mobile App',
     ],
   },
   {

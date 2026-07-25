@@ -72,6 +72,7 @@ export default function MarketingFooter() {
               <li><SectionLink id="pricing">Pricing</SectionLink></li>
               <li><SectionLink id="how-it-works">How It Works</SectionLink></li>
               <li><SectionLink id="faq">FAQ</SectionLink></li>
+              <li><Link to="/sortly-alternative" className="text-sm text-gray-300 hover:text-white transition-colors">Sortly Alternative</Link></li>
             </ul>
           </div>
 

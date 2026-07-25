@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     q: 'Can I use iinwentory offline?',
-    a: "Yes! iinwentory is a Progressive Web App (PWA) that works fully offline. Add it to your home screen on any mobile device and access, update, and scan items even without internet. Changes sync automatically when you're back online.",
+    a: "The native mobile app is built for the field — scan and update items on the go, even with no signal, and it syncs automatically once you're back online. The web app runs in your browser and needs an internet connection.",
   },
   {
     q: 'Does iinwentory work with barcode scanners?',
