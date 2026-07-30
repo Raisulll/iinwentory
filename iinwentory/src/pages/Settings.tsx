@@ -164,14 +164,16 @@ export default function Settings() {
     setOfferReason(null);
     try {
       const paidPlans = ['advanced', 'premium'] as const;
-      const results = await Promise.all(paidPlans.map(async (planId) => {
-        try {
-          const r = await apiPost<OfferValidation>('/api/billing/validate-offer', { offer: code, planId });
-          return [planId, r] as const;
-        } catch {
-          return [planId, { valid: false as const }] as const;
-        }
-      }));
+      const results = await Promise.all(paidPlans.map(
+        async (planId): Promise<readonly [typeof planId, OfferValidation]> => {
+          try {
+            const r = await apiPost<OfferValidation>('/api/billing/validate-offer', { offer: code, planId });
+            return [planId, r];
+          } catch {
+            return [planId, { valid: false }];
+          }
+        },
+      ));
       const byPlan: Partial<Record<PlanId, ValidOffer>> = {};
       let firstReason: string | null = null;
       for (const [planId, r] of results) {
@@ -201,7 +203,8 @@ export default function Settings() {
 
   // Discounted monthly price for a plan card given the applied offer, or null
   // if no offer applies to that plan. Display only — Stripe computes the charge.
-  const discountedPrice = (planId: PlanId, price: number): number | null => {
+  const discountedPrice = (planId: PlanId, price: number | null): number | null => {
+    if (price === null) return null;
     const o = offerByPlan[planId];
     if (!o) return null;
     if (o.percentOff) return price * (1 - o.percentOff / 100);
