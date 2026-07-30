@@ -7,6 +7,7 @@
  * `?register=1` + `?plan=` to open the sign-up flow on the chosen tier.
  */
 import { useAuth } from '../../store/useAuthStore';
+import { getStoredOffer } from '../../lib/offer';
 
 export const SIGN_IN_URL = '/login';
 export const APP_URL = '/dashboard';
@@ -37,11 +38,14 @@ export function useCtaLinks() {
     launchApp: isLoggedIn ? APP_URL : registerUrl(),
     /** Plan-specific pricing CTA. */
     planHref(plan?: string, cycle: 'monthly' | 'yearly' = 'yearly'): string {
+      // A captured ?offer= rides along so the discount reaches checkout. For
+      // logged-out visitors it's already in localStorage (read at onboarding
+      // checkout); logged-in users get it in the URL for Settings to pick up.
       if (!isLoggedIn) return registerUrl(plan);
-      // Paid tiers deep-link into checkout; free/unknown just open the tab.
-      return plan && plan !== 'free'
-        ? `/settings?upgrade=${plan}&cycle=${cycle}`
-        : BILLING_URL;
+      if (!plan || plan === 'free') return BILLING_URL;
+      const offer = getStoredOffer();
+      const offerParam = offer ? `&offer=${encodeURIComponent(offer)}` : '';
+      return `/settings?upgrade=${plan}&cycle=${cycle}${offerParam}`;
     },
   };
 }

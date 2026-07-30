@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../store/useAuthStore';
 import { apiPost, apiPut } from '../lib/api';
+import { getStoredOffer, clearStoredOffer } from '../lib/offer';
 import { PLANS, type PlanId } from '../plans';
 import {
   User as UserIcon, Building2, Factory, ShoppingBag, Stethoscope,
@@ -116,11 +117,16 @@ export default function Onboarding() {
       // Paid plan? → Stripe checkout. Free? → dashboard.
       if (data.planId !== 'free') {
         try {
+          // Forward a captured promo offer; the server re-validates eligibility
+          // and silently ignores it if it doesn't apply.
+          const offer = getStoredOffer();
           const checkout = await apiPost<{ url: string }>('/api/billing/checkout', {
             planId: data.planId,
             billing: data.billingCycle,
+            ...(offer ? { offer } : {}),
           });
           if (checkout?.url) {
+            clearStoredOffer();
             window.location.href = checkout.url;
             return;
           }

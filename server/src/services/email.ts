@@ -148,6 +148,30 @@ export async function sendTeamInviteEmail(
   }));
 }
 
+/**
+ * Promotional offer / campaign email. Sent in bulk from the admin Offers panel.
+ * Carries the promo code, a one-click apply link (?offer=<slug>), and a required
+ * unsubscribe link. `discountLabel` is a pre-formatted string like "30% off".
+ */
+export async function sendOfferEmail(
+  email: string,
+  opts: { slug: string; description: string; discountLabel: string; unsubscribeUrl: string },
+): Promise<boolean> {
+  const { slug, description, discountLabel, unsubscribeUrl } = opts;
+  const code = slug.toUpperCase();
+  const applyUrl = `${frontendUrl()}/?offer=${encodeURIComponent(slug)}`;
+  return sendMail(email, `${discountLabel} on iinwentory`, renderLayout({
+    heading: `${discountLabel} — just for you`,
+    bodyHtml: `
+      <p style="margin:0 0 14px;">${description}</p>
+      <p style="margin:0 0 8px;">Use this code at checkout:</p>
+      <p style="font-size:22px; font-weight:700; letter-spacing:2px; font-family:monospace; color:#294EA7; margin:0 0 4px;">${code}</p>
+      <p style="margin:8px 0 0; font-size:13px; color:#94a3b8;">Or just tap the button below and it's applied automatically.</p>`,
+    cta: { label: 'Claim your discount', url: applyUrl },
+    footnote: `You're receiving this because you have an iinwentory account. <a href="${unsubscribeUrl}" style="color:#94a3b8;">Unsubscribe</a> from promotional emails.`,
+  }));
+}
+
 export async function sendLowStockEmail(
   email: string,
   opts: { orgName: string; items: { name: string; quantity: number; minQuantity: number }[] },

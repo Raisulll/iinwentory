@@ -52,6 +52,8 @@ model Profile {
   businessName       String?  @map("business_name")
   businessAddress    String?  @map("business_address")
   passwordWasReset   Boolean? @default(false) @map("password_was_reset")
+  marketingOptIn     Boolean  @default(false) @map("marketing_opt_in")
+  marketingUnsubscribedAt DateTime? @map("marketing_unsubscribed_at") @db.Timestamptz(6)
 
   user               AuthUser @relation(fields: [id], references: [id], onDelete: Cascade)
   teamMember         TeamMember?
@@ -520,6 +522,45 @@ model TeamBilling {
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("team_billing")
+  @@schema("public")
+}
+
+// Maps a public offer slug (used as both the ?offer= link param and the typed
+// promo code) onto a Stripe Coupon, plus app-side rules Stripe can't express.
+// See init/10_offers.sql.
+model Offer {
+  slug           String    @id
+  stripeCouponId String    @map("stripe_coupon_id")
+  description    String?
+  newUsersOnly   Boolean   @default(true) @map("new_users_only")
+  allowedPlans   String[]  @default(["advanced", "premium"]) @map("allowed_plans")
+  active         Boolean   @default(true)
+  validUntil     DateTime? @map("valid_until") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  emailLog       OfferEmailLog[]
+
+  @@map("offers")
+  @@schema("public")
+}
+
+// One row per (offer, recipient) campaign email. Backs dedupe + audit for the
+// admin Offers "Send email" feature. See init/12_offer_campaigns.sql.
+model OfferEmailLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  offerSlug String   @map("offer_slug")
+  userId    String?  @map("user_id") @db.Uuid
+  email     String
+  status    String   @default("sent")
+  error     String?
+  sentAt    DateTime @default(now()) @map("sent_at") @db.Timestamptz(6)
+
+  offer     Offer    @relation(fields: [offerSlug], references: [slug], onDelete: Cascade)
+
+  @@unique([offerSlug, email], map: "offer_email_log_offer_email_key")
+  @@index([offerSlug], map: "idx_offer_email_log_offer")
+  @@map("offer_email_log")
   @@schema("public")
 }
 

@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { Shield, LayoutGrid, Inbox, Building2, Users as UsersIcon, CreditCard, Cog } from 'lucide-react';
+import { Shield, LayoutGrid, Inbox, Building2, Users as UsersIcon, CreditCard, Cog, TicketPercent } from 'lucide-react';
 import HelpButton from '../components/HelpButton';
 import AdminOverview from './admin/AdminOverview';
 import AdminFeedback from './admin/AdminFeedback';
 import AdminTeams from './admin/AdminTeams';
 import AdminUsers from './admin/AdminUsers';
 import AdminBilling from './admin/AdminBilling';
+import AdminOffers from './admin/AdminOffers';
 import AdminSystem from './admin/AdminSystem';
 
-type AdminTab = 'overview' | 'feedback' | 'teams' | 'users' | 'billing' | 'system';
+type AdminTab = 'overview' | 'feedback' | 'teams' | 'users' | 'billing' | 'offers' | 'system';
 
 const TABS: { value: AdminTab; label: string; icon: typeof Inbox; title: string; sub: string }[] = [
   {
@@ -35,6 +36,11 @@ const TABS: { value: AdminTab; label: string; icon: typeof Inbox; title: string;
     value: 'billing', label: 'Billing', icon: CreditCard,
     title: 'Billing',
     sub: 'Subscriptions and plan tiers. Catches drift between the web (team_billing) and mobile (teams.plan) sources, and lets you reconcile or comp a plan.',
+  },
+  {
+    value: 'offers', label: 'Offers', icon: TicketPercent,
+    title: 'Promotional offers',
+    sub: 'Discount codes mapped to Stripe coupons. Each slug works as a ?offer= link and a typed promo code; create the coupon in Stripe, then map it here and track redemptions.',
   },
   {
     value: 'system', label: 'System', icon: Cog,
@@ -93,6 +99,7 @@ export default function Admin() {
       <div style={{ display: tab === 'teams' ? 'block' : 'none' }}><AdminTeams /></div>
       <div style={{ display: tab === 'users' ? 'block' : 'none' }}><AdminUsers /></div>
       <div style={{ display: tab === 'billing' ? 'block' : 'none' }}><AdminBilling /></div>
+      <div style={{ display: tab === 'offers' ? 'block' : 'none' }}><AdminOffers /></div>
       <div style={{ display: tab === 'system' ? 'block' : 'none' }}><AdminSystem /></div>
 
       <style>{`

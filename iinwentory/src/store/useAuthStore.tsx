@@ -33,8 +33,8 @@ interface AuthContextType {
   org: OrgInfo | null;
   plan: Plan;
   login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
-  loginWithGoogle: (credential: string) => Promise<{ ok: true; isNewUser: boolean } | { ok: false; error: string }>;
-  register: (name: string, email: string, password: string, planId: PlanId, inviteCode?: string) => Promise<void>;
+  loginWithGoogle: (credential: string, consent?: { acceptedTerms?: boolean; marketingOptIn?: boolean }) => Promise<{ ok: true; isNewUser: boolean } | { ok: false; error: string }>;
+  register: (name: string, email: string, password: string, planId: PlanId, inviteCode?: string, marketingOptIn?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   upgradePlan: (planId: PlanId) => void;
   refreshOrgPlan: () => Promise<void>;
@@ -120,12 +120,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithGoogle = useCallback(async (
     credential: string,
+    consent?: { acceptedTerms?: boolean; marketingOptIn?: boolean },
   ): Promise<{ ok: true; isNewUser: boolean } | { ok: false; error: string }> => {
     try {
       const data = await apiPost<{
         accessToken: string; refreshToken: string;
         user: AuthUser; org: OrgInfo | null; isNewUser: boolean;
-      }>('/api/auth/google', { credential });
+      }>('/api/auth/google', {
+        credential,
+        acceptedTerms: !!consent?.acceptedTerms,
+        marketingOptIn: !!consent?.marketingOptIn,
+      });
 
       const planId = data.org?.planId ?? 'free';
       setTokens(data.accessToken, data.refreshToken);
@@ -144,9 +149,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (
-    name: string, email: string, password: string, planId: PlanId, inviteCode?: string,
+    name: string, email: string, password: string, planId: PlanId, inviteCode?: string, marketingOptIn?: boolean,
   ): Promise<void> => {
-    const payload: Record<string, unknown> = { name, email, password, planId };
+    const payload: Record<string, unknown> = { name, email, password, planId, marketingOptIn: !!marketingOptIn };
     if (inviteCode && inviteCode.trim()) {
       payload.inviteCode = inviteCode.trim().toUpperCase();
     }

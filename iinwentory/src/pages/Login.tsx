@@ -43,6 +43,8 @@ export default function Login() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
   const [resetSucceeded, setResetSucceeded] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn || mode === 'reset') return;
@@ -81,12 +83,14 @@ export default function Login() {
         if (!name.trim()) { setError('Name is required.'); return; }
         if (!email.includes('@')) { setError('Enter a valid email.'); return; }
         if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+        if (!agreedToTerms) { setError('Please agree to the Terms of Service and Privacy Policy to continue.'); return; }
         await register(
           name.trim(),
           email.trim(),
           password,
           planId,
           inviteCode.trim() || undefined,
+          marketingOptIn,
         );
       } else if (mode === 'forgot') {
         if (!email.includes('@')) { setError('Enter a valid email.'); return; }
@@ -106,11 +110,20 @@ export default function Login() {
   }
 
   async function handleGoogleCredential(credential: string) {
+    // Defensive: in register mode the button is disabled until Terms are ticked,
+    // but guard here too so consent can never be bypassed.
+    if (mode === 'register' && !agreedToTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy to continue.');
+      return;
+    }
     setError('');
     setSubmitting(true);
     setGoogleLoading(true);
     try {
-      const result = await loginWithGoogle(credential);
+      const result = await loginWithGoogle(credential, {
+        acceptedTerms: mode === 'register' ? agreedToTerms : false,
+        marketingOptIn: mode === 'register' ? marketingOptIn : false,
+      });
       if (!result.ok) { setError(result.error); return; }
       // New Google users go through onboarding; returning users skip to the app.
       // Reuse the mode-based redirect effect by setting the matching mode.
@@ -238,8 +251,13 @@ export default function Login() {
                 text={mode === 'register' ? 'signup_with' : 'signin_with'}
                 onCredential={handleGoogleCredential}
                 onError={setError}
-                disabled={submitting}
+                disabled={submitting || (mode === 'register' && !agreedToTerms)}
               />
+              {mode === 'register' && !agreedToTerms && (
+                <p className="auth-consent-hint">
+                  Tick <b>"I agree to the Terms of Service"</b> below to continue with Google.
+                </p>
+              )}
               <div className="auth-divider">
                 <span>or {mode === 'register' ? 'sign up' : 'sign in'} with email</span>
               </div>
@@ -419,6 +437,40 @@ export default function Login() {
                 </div>
               )}
 
+              {mode === 'register' && (
+                <div className="auth-consent">
+                  <label className="auth-check">
+                    <input
+                      type="checkbox"
+                      checked={agreedToTerms}
+                      onChange={e => setAgreedToTerms(e.target.checked)}
+                    />
+                    <span className="auth-check-box" aria-hidden="true">
+                      <Check size={11} strokeWidth={3.2} />
+                    </span>
+                    <span className="auth-check-label">
+                      I agree to the{' '}
+                      <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> and{' '}
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+                    </span>
+                  </label>
+                  <label className="auth-check">
+                    <input
+                      type="checkbox"
+                      checked={marketingOptIn}
+                      onChange={e => setMarketingOptIn(e.target.checked)}
+                    />
+                    <span className="auth-check-box" aria-hidden="true">
+                      <Check size={11} strokeWidth={3.2} />
+                    </span>
+                    <span className="auth-check-label">
+                      Send me product updates, tips, and promotional emails.{' '}
+                      <span className="auth-check-meta">(optional)</span>
+                    </span>
+                  </label>
+                </div>
+              )}
+
               {error && (
                 <div className="auth-error">
                   <AlertCircle size={15} strokeWidth={2.2} />
@@ -426,7 +478,11 @@ export default function Login() {
                 </div>
               )}
 
-              <button type="submit" disabled={submitting} className="submit-btn">
+              <button
+                type="submit"
+                disabled={submitting || (mode === 'register' && !agreedToTerms)}
+                className="submit-btn"
+              >
                 {submitting ? (
                   <span className="submit-loading">
                     <span className="loading-dot" />
@@ -460,13 +516,6 @@ export default function Login() {
             </form>
           )}
 
-          {mode === 'register' && !forgotSent && !resetSucceeded && (
-            <p className="auth-fineprint">
-              By creating an account you agree to our{' '}
-              <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> and{' '}
-              <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
-            </p>
-          )}
         </div>
 
         <p className="auth-footer-mark">
@@ -1097,6 +1146,62 @@ const authStyles = `
   .auth-link-btn.small { font-size: 11.5px; }
 
   .auth-form-footer { text-align: center; margin-top: 4px; }
+
+  /* ────────────────  CONSENT CHECKBOXES  ──────────────── */
+  .auth-consent-hint {
+    text-align: center;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    margin-top: -4px;
+  }
+  .auth-consent-hint b { color: var(--text-medium); font-weight: 600; }
+  .auth-consent {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 2px;
+  }
+  .auth-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-medium);
+  }
+  .auth-check input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .auth-check-box {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--card-bg);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.16s var(--ease);
+  }
+  .auth-check-box svg { opacity: 0; transform: scale(0.6); transition: all 0.16s var(--ease); }
+  .auth-check input:checked + .auth-check-box {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+  .auth-check input:checked + .auth-check-box svg { opacity: 1; transform: scale(1); }
+  .auth-check input:focus-visible + .auth-check-box { box-shadow: var(--ring-primary); }
+  .auth-check:hover .auth-check-box { border-color: var(--primary); }
+  .auth-check-label a { color: var(--text-dark); text-decoration: underline; font-weight: 600; }
+  .auth-check-label a:hover { color: var(--primary); }
+  .auth-check-meta { color: var(--text-muted); font-weight: 500; }
 
   .auth-fineprint {
     margin-top: 18px;

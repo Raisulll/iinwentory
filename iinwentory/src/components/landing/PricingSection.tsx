@@ -1,6 +1,16 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { registerUrl, useCtaLinks } from './links';
+import { apiGet } from '../../lib/api';
+import { captureOfferFromUrl } from '../../lib/offer';
+
+type OfferBanner = {
+  slug: string;
+  description: string | null;
+  percentOff: number | null;
+  amountOff: number | null;
+  newUsersOnly: boolean;
+};
 
 type Billing = 'yearly' | 'monthly';
 
@@ -213,7 +223,28 @@ function CtaLink({ href, className, children }: { href: string; className: strin
 export default function PricingSection() {
   const [billing, setBilling] = useState<Billing>('yearly');
   const [showCompare, setShowCompare] = useState(false);
+  const [offer, setOffer] = useState<OfferBanner | null>(null);
   const { planHref } = useCtaLinks();
+
+  // Surface an active promo (?offer= link or a previously stored one) as a
+  // banner. Public endpoint — shows the discount size, not eligibility.
+  useEffect(() => {
+    const slug = captureOfferFromUrl();
+    if (!slug) return;
+    let cancelled = false;
+    apiGet<OfferBanner>(`/api/offers/${encodeURIComponent(slug)}`)
+      .then(info => { if (!cancelled) setOffer(info); })
+      .catch(() => { /* invalid/expired code — no banner */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const offerBadge = offer
+    ? offer.percentOff
+      ? `${offer.percentOff}% OFF`
+      : offer.amountOff
+        ? `$${(offer.amountOff / 100).toFixed(2)} OFF`
+        : 'OFFER'
+    : '';
 
   // External (mailto) CTAs are left as-is; in-app CTAs become auth-aware so
   // logged-in users go to Billing & Plan / checkout instead of onboarding.
@@ -284,6 +315,22 @@ export default function PricingSection() {
             </p>
           )}
         </div>
+
+        {/* Active-offer banner */}
+        {offer && (
+          <div className="mx-auto mt-10 max-w-2xl reveal">
+            <div className="flex items-center justify-center gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 px-5 py-3.5 text-center shadow-sm">
+              <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-500 px-3 py-1 text-xs font-extrabold tracking-wide text-white shadow-sm">
+                {offerBadge}
+              </span>
+              <p className="text-sm font-medium text-emerald-900">
+                {offer.description || 'Limited-time offer'}
+                {offer.newUsersOnly && <span className="text-emerald-700"> — for new customers</span>}
+                <span className="text-emerald-700">. Applied automatically at checkout.</span>
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Pricing cards */}
         <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-4">

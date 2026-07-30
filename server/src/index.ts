@@ -30,6 +30,7 @@ import {
   sendPasswordChangedEmail,
   sendTeamInviteEmail,
   sendLowStockEmail,
+  sendOfferEmail,
   verifyEmailConfig,
 } from './services/email.js';
 import {
@@ -39,7 +40,13 @@ import {
   createCustomer,
   createCheckoutSession,
   createPortalSession,
+  createCoupon,
+  getValidCoupon,
+  getCouponDetails,
+  couponExists,
+  customerHasEverSubscribed,
 } from './services/stripe.js';
+import jwt from 'jsonwebtoken';
 import { PLAN_IDS, PLANS, type PlanId } from './utils/plans.js';
 import { createClient } from '@supabase/supabase-js';
 import { OAuth2Client } from 'google-auth-library';
@@ -406,6 +413,7 @@ app.post('/api/auth/register', async (req, res) => {
     password: z.string().min(6),
     planId: z.enum(PLAN_IDS as readonly [string, ...string[]]).default('free'),
     inviteCode: z.string().trim().min(1).max(32).optional(),
+    marketingOptIn: z.boolean().optional().default(false),
   });
 
   const parsed = schema.safeParse(req.body);
@@ -414,7 +422,7 @@ app.post('/api/auth/register', async (req, res) => {
     return;
   }
 
-  const { name, email, password, planId, inviteCode } = parsed.data;
+  const { name, email, password, planId, inviteCode, marketingOptIn } = parsed.data;
   const lowerEmail = email.toLowerCase();
 
   // Pre-validate invite code (if provided) before creating any records.
@@ -475,8 +483,8 @@ app.post('/api/auth/register', async (req, res) => {
   // Profile may not exist yet in vanilla Postgres without trigger — upsert.
   await prisma.profile.upsert({
     where: { id: userId },
-    update: { fullName: name },
-    create: { id: userId, fullName: name },
+    update: { fullName: name, marketingOptIn },
+    create: { id: userId, fullName: name, marketingOptIn },
   });
 
   if (pendingInvite) {
@@ -600,9 +608,17 @@ app.post('/api/auth/google', async (req, res) => {
     return;
   }
 
-  const schema = z.object({ credential: z.string().min(1) });
+  const schema = z.object({
+    credential: z.string().min(1),
+    // Consent captured on the sign-up form. Only enforced when this credential
+    // would create a NEW account (see below); ignored for returning users who
+    // already accepted the Terms at their original sign-up.
+    acceptedTerms: z.boolean().optional().default(false),
+    marketingOptIn: z.boolean().optional().default(false),
+  });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: 'Missing Google credential' }); return; }
+  const { acceptedTerms, marketingOptIn } = parsed.data;
 
   // Verify the ID token: checks Google's signature, that `aud` is our client id,
   // that `iss` is accounts.google.com, and that it hasn't expired.
@@ -648,6 +664,16 @@ app.post('/api/auth/google', async (req, res) => {
       WHERE id = ${userId}::uuid
         AND NOT COALESCE(raw_app_meta_data->'providers' @> '["google"]'::jsonb, false)`;
   } else {
+    // Fresh sign-up. Consent is mandatory to create an account — enforce it here
+    // so EVERY Google sign-up path is covered (register tab, or a new user who
+    // clicked Google under the Sign In tab). Nothing is created before this check.
+    if (!acceptedTerms) {
+      res.status(403).json({
+        error: 'Please accept the Terms of Service to create an account. Switch to the Register tab, tick the box, then continue with Google.',
+      });
+      return;
+    }
+
     // Fresh sign-up. Mirrors /register, minus the password: a Google-only user
     // has no encrypted_password and simply can't password-login.
     isNewUser = true;
@@ -677,8 +703,8 @@ app.post('/api/auth/google', async (req, res) => {
 
     await prisma.profile.upsert({
       where: { id: userId },
-      update: { fullName: name, avatarUrl: avatarUrl ?? undefined },
-      create: { id: userId, fullName: name, avatarUrl: avatarUrl ?? undefined },
+      update: { fullName: name, avatarUrl: avatarUrl ?? undefined, marketingOptIn },
+      create: { id: userId, fullName: name, avatarUrl: avatarUrl ?? undefined, marketingOptIn },
     });
 
     const team = await prisma.team.create({
@@ -2115,6 +2141,350 @@ app.post('/api/admin/teams/:id/reconcile', requireAuth, requireSuperAdmin, async
   res.json({ ok: true, plan: target });
 });
 
+// ── Platform Admin · Promotional offers ───────────────────────────────────────
+//
+// CRUD over the offers table (slug → Stripe coupon + app-side rules). The
+// coupon itself lives in Stripe; here we manage the mapping and surface Stripe's
+// redemption counts for attribution. All mutations are audit-logged.
+
+const PAID_PLAN_IDS = ['advanced', 'premium'] as const;
+
+// Serialize one offer joined with its live Stripe coupon detail.
+function serializeOffer(
+  o: { slug: string; stripeCouponId: string; description: string | null; newUsersOnly: boolean; allowedPlans: string[]; active: boolean; validUntil: Date | null; createdAt: Date },
+  coupon: Awaited<ReturnType<typeof getCouponDetails>>,
+) {
+  const expired = !!o.validUntil && o.validUntil.getTime() < Date.now();
+  return {
+    slug: o.slug,
+    stripeCouponId: o.stripeCouponId,
+    description: o.description,
+    newUsersOnly: o.newUsersOnly,
+    allowedPlans: o.allowedPlans,
+    active: o.active,
+    validUntil: o.validUntil ? o.validUntil.toISOString() : null,
+    createdAt: o.createdAt.toISOString(),
+    expired,
+    // Live (or missing) — lets the UI warn when a coupon was deleted in Stripe.
+    coupon: coupon
+      ? {
+          percentOff: coupon.percentOff,
+          amountOff: coupon.amountOff,
+          valid: coupon.valid,
+          timesRedeemed: coupon.timesRedeemed,
+          maxRedemptions: coupon.maxRedemptions,
+          redeemBy: coupon.redeemBy,
+        }
+      : null,
+  };
+}
+
+app.get('/api/admin/offers', requireAuth, requireSuperAdmin, async (_req, res) => {
+  const offers = await prisma.offer.findMany({ orderBy: { createdAt: 'desc' } });
+  // Fetch each coupon's live detail (null when Stripe is unconfigured / deleted).
+  const withCoupons = await Promise.all(
+    offers.map(async (o) => serializeOffer(o, await getCouponDetails(o.stripeCouponId))),
+  );
+  const summary = {
+    total: withCoupons.length,
+    active: withCoupons.filter(o => o.active && !o.expired).length,
+    redemptions: withCoupons.reduce((n, o) => n + (o.coupon?.timesRedeemed ?? 0), 0),
+  };
+  res.json({ items: withCoupons, summary });
+});
+
+// A new coupon to mint in Stripe (alternative to referencing an existing one).
+// Exactly one of percentOff / amountOff.
+const newCouponSchema = z.object({
+  percentOff: z.number().positive().max(100).nullish(),
+  amountOff: z.number().int().positive().nullish(), // cents
+  duration: z.enum(['once', 'repeating', 'forever']).default('once'),
+  durationInMonths: z.number().int().positive().max(36).nullish(),
+  maxRedemptions: z.number().int().positive().nullish(),
+}).refine(c => (c.percentOff != null) !== (c.amountOff != null), {
+  message: 'Provide exactly one of percentOff or amountOff',
+});
+
+// Base shape (used directly for PATCH via .partial()). The create route wraps it
+// in a refinement requiring a coupon source.
+const offerBaseSchema = z.object({
+  slug: z.string().trim().min(2).max(64).regex(/^[a-zA-Z0-9_-]+$/, 'Letters, numbers, - and _ only'),
+  // Either reference an existing coupon by id, or provide `coupon` to mint one.
+  stripeCouponId: z.string().trim().min(1).max(255).optional(),
+  coupon: newCouponSchema.optional(),
+  description: z.string().trim().max(200).optional(),
+  newUsersOnly: z.boolean().optional(),
+  allowedPlans: z.array(z.enum(PAID_PLAN_IDS)).min(1).optional(),
+  active: z.boolean().optional(),
+  validUntil: z.string().datetime().nullable().optional(),
+});
+
+const offerCreateSchema = offerBaseSchema.refine(d => !!d.stripeCouponId || !!d.coupon, {
+  message: 'Provide a Stripe coupon id or coupon details to create one',
+});
+
+app.post('/api/admin/offers', requireAuth, requireSuperAdmin, async (req, res) => {
+  const parsed = offerCreateSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }); return; }
+  const d = parsed.data;
+  const slug = d.slug.toLowerCase();
+
+  // Resolve the coupon id: either mint a new Stripe coupon from `coupon`, or
+  // reference an existing id (validated to exist when Stripe is configured).
+  let couponId = d.stripeCouponId ?? '';
+  if (d.coupon) {
+    if (!stripe) { res.status(503).json({ error: 'Stripe not configured — cannot create a coupon' }); return; }
+    try {
+      const created = await createCoupon({
+        percentOff: d.coupon.percentOff ?? null,
+        amountOff: d.coupon.amountOff ?? null,
+        duration: d.coupon.duration,
+        durationInMonths: d.coupon.durationInMonths ?? null,
+        maxRedemptions: d.coupon.maxRedemptions ?? null,
+        name: d.description ?? slug,
+      });
+      if (!created) { res.status(500).json({ error: 'Failed to create Stripe coupon' }); return; }
+      couponId = created;
+    } catch (e) {
+      res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to create Stripe coupon' });
+      return;
+    }
+  } else if (stripe && !(await couponExists(couponId))) {
+    // Reject a coupon Stripe doesn't know about — but only when we can actually
+    // check (Stripe configured). Unconfigured envs can still seed the mapping.
+    res.status(400).json({ error: `No Stripe coupon "${couponId}" found` });
+    return;
+  }
+
+  const data = {
+    stripeCouponId: couponId,
+    description: d.description ?? null,
+    newUsersOnly: d.newUsersOnly ?? true,
+    allowedPlans: d.allowedPlans ?? [...PAID_PLAN_IDS],
+    active: d.active ?? true,
+    validUntil: d.validUntil ? new Date(d.validUntil) : null,
+  };
+  const existed = await prisma.offer.findUnique({ where: { slug } });
+  const offer = await prisma.offer.upsert({
+    where: { slug },
+    update: data,
+    create: { slug, ...data },
+  });
+
+  await logAdmin({
+    adminUserId: req.auth!.userId,
+    action: existed ? 'offer.updated' : 'offer.created',
+    targetType: 'offer',
+    targetId: slug,
+    details: { ...data },
+  });
+  res.json(serializeOffer(offer, await getCouponDetails(offer.stripeCouponId)));
+});
+
+// Partial update — used by the panel's active toggle and inline edits.
+app.patch('/api/admin/offers/:slug', requireAuth, requireSuperAdmin, async (req, res) => {
+  const slug = String(req.params.slug).toLowerCase();
+  const schema = offerBaseSchema.partial().omit({ slug: true, coupon: true });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }); return; }
+
+  const existing = await prisma.offer.findUnique({ where: { slug } });
+  if (!existing) { res.status(404).json({ error: 'Offer not found' }); return; }
+
+  const d = parsed.data;
+  if (d.stripeCouponId && stripe && !(await couponExists(d.stripeCouponId))) {
+    res.status(400).json({ error: `No Stripe coupon "${d.stripeCouponId}" found` });
+    return;
+  }
+
+  const offer = await prisma.offer.update({
+    where: { slug },
+    data: {
+      ...(d.stripeCouponId !== undefined && { stripeCouponId: d.stripeCouponId }),
+      ...(d.description !== undefined && { description: d.description ?? null }),
+      ...(d.newUsersOnly !== undefined && { newUsersOnly: d.newUsersOnly }),
+      ...(d.allowedPlans !== undefined && { allowedPlans: d.allowedPlans }),
+      ...(d.active !== undefined && { active: d.active }),
+      ...(d.validUntil !== undefined && { validUntil: d.validUntil ? new Date(d.validUntil) : null }),
+    },
+  });
+
+  await logAdmin({
+    adminUserId: req.auth!.userId,
+    action: 'offer.updated',
+    targetType: 'offer',
+    targetId: slug,
+    details: { ...d },
+  });
+  res.json(serializeOffer(offer, await getCouponDetails(offer.stripeCouponId)));
+});
+
+app.delete('/api/admin/offers/:slug', requireAuth, requireSuperAdmin, async (req, res) => {
+  const slug = String(req.params.slug).toLowerCase();
+  const existing = await prisma.offer.findUnique({ where: { slug } });
+  if (!existing) { res.status(404).json({ error: 'Offer not found' }); return; }
+
+  await prisma.offer.delete({ where: { slug } });
+  await logAdmin({
+    adminUserId: req.auth!.userId,
+    action: 'offer.deleted',
+    targetType: 'offer',
+    targetId: slug,
+    details: { stripeCouponId: existing.stripeCouponId },
+  });
+  res.json({ ok: true });
+});
+
+// ── Platform Admin · Offer email campaigns ────────────────────────────────────
+//
+// Emails a promo code to a targeted slice of account owners. Audience is chosen
+// at send time (not stored on the offer) so one offer can drive several
+// campaigns. We email one address per team — the highest-privileged member
+// (owner > admin > member) — and always suppress users who unsubscribed. Each
+// (offer, email) send is recorded in offer_email_log so re-running skips prior
+// recipients.
+
+const SEND_CAP = 2000; // hard ceiling per send, so an admin click can't fan out unbounded
+
+const audienceSchema = z.object({
+  audience: z.enum(['new_users', 'existing_subscribers', 'plan', 'everyone']),
+  plan: z.enum(PLAN_IDS as unknown as [string, ...string[]]).optional(),
+  signupFrom: z.string().datetime().nullable().optional(),
+  signupTo: z.string().datetime().nullable().optional(),
+});
+type AudienceParams = z.infer<typeof audienceSchema>;
+
+// Resolves the audience to a deduped list of {userId, email} account owners.
+async function resolveAudienceRecipients(
+  slug: string,
+  p: AudienceParams,
+  opts: { excludeSent: boolean; limit: number },
+): Promise<{ userId: string; email: string }[]> {
+  const params: unknown[] = [];
+  const add = (v: unknown) => { params.push(v); return `$${params.length}`; };
+  const conds: string[] = ['u.email IS NOT NULL', 'p.marketing_unsubscribed_at IS NULL'];
+
+  if (p.audience === 'new_users') {
+    conds.push(`COALESCE(tb.plan_id, 'free') = 'free' AND tb.stripe_customer_id IS NULL`);
+  } else if (p.audience === 'existing_subscribers') {
+    conds.push(`(tb.stripe_customer_id IS NOT NULL OR COALESCE(tb.plan_id, 'free') <> 'free')`);
+  } else if (p.audience === 'plan') {
+    conds.push(`COALESCE(tb.plan_id, 'free') = ${add(p.plan ?? 'free')}`);
+  }
+  if (p.signupFrom) conds.push(`p.created_at >= ${add(new Date(p.signupFrom))}`);
+  if (p.signupTo) conds.push(`p.created_at <= ${add(new Date(p.signupTo))}`);
+  if (opts.excludeSent) {
+    conds.push(`NOT EXISTS (SELECT 1 FROM public.offer_email_log l WHERE l.offer_slug = ${add(slug)} AND l.email = lower(u.email))`);
+  }
+
+  const limitClause = opts.limit > 0 ? `LIMIT ${add(opts.limit)}` : '';
+  const sql = `
+    SELECT user_id::text AS "userId", email FROM (
+      SELECT DISTINCT ON (t.id)
+        tm.user_id AS user_id,
+        lower(u.email) AS email
+      FROM public.teams t
+      JOIN public.team_members tm ON tm.team_id = t.id
+      JOIN public.profiles p ON p.id = tm.user_id
+      JOIN auth.users u ON u.id = tm.user_id
+      LEFT JOIN public.team_billing tb ON tb.team_id = t.id
+      WHERE ${conds.join(' AND ')}
+      ORDER BY t.id, CASE tm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END
+    ) q
+    GROUP BY user_id, email
+    ${limitClause}`;
+
+  return prisma.$queryRawUnsafe<{ userId: string; email: string }[]>(sql, ...params);
+}
+
+// Pre-formatted "30% off" / "$10.00 off" label from the offer's live coupon.
+function couponDiscountLabel(c: Awaited<ReturnType<typeof getCouponDetails>>): string {
+  if (c?.percentOff) return `${c.percentOff}% off`;
+  if (c?.amountOff) return `$${(c.amountOff / 100).toFixed(2)} off`;
+  return 'a discount';
+}
+
+// Preview how many people a campaign would reach (already-sent excluded) + a sample.
+app.post('/api/admin/offers/:slug/preview-audience', requireAuth, requireSuperAdmin, async (req, res) => {
+  const slug = String(req.params.slug).toLowerCase();
+  const offer = await prisma.offer.findUnique({ where: { slug } });
+  if (!offer) { res.status(404).json({ error: 'Offer not found' }); return; }
+  const parsed = audienceSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }); return; }
+
+  const recipients = await resolveAudienceRecipients(slug, parsed.data, { excludeSent: true, limit: 0 });
+  res.json({
+    count: recipients.length,
+    capped: recipients.length > SEND_CAP,
+    sendCap: SEND_CAP,
+    sample: recipients.slice(0, 5).map(r => r.email),
+  });
+});
+
+app.post('/api/admin/offers/:slug/send', requireAuth, requireSuperAdmin, async (req, res) => {
+  const slug = String(req.params.slug).toLowerCase();
+  const offer = await prisma.offer.findUnique({ where: { slug } });
+  if (!offer) { res.status(404).json({ error: 'Offer not found' }); return; }
+  const parsed = audienceSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }); return; }
+
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  if (!jwtSecret) { res.status(503).json({ error: 'Server not configured for signed links' }); return; }
+
+  const coupon = stripe ? await getCouponDetails(offer.stripeCouponId) : null;
+  const discountLabel = couponDiscountLabel(coupon);
+  const description = offer.description || `${discountLabel} on your iinwentory plan`;
+  const apiBase = process.env.PUBLIC_API_URL || `${req.protocol}://${req.get('host')}`;
+
+  const recipients = await resolveAudienceRecipients(slug, parsed.data, { excludeSent: true, limit: SEND_CAP });
+
+  let sent = 0, failed = 0;
+  for (const r of recipients) {
+    const token = jwt.sign({ sub: r.userId, purpose: 'unsub' }, jwtSecret, { algorithm: 'HS256', expiresIn: '365d' });
+    const unsubscribeUrl = `${apiBase}/api/unsubscribe?token=${encodeURIComponent(token)}`;
+    const ok = await sendOfferEmail(r.email, { slug, description, discountLabel, unsubscribeUrl });
+    if (ok) sent++; else failed++;
+    // Record the attempt so re-sends skip it. Unique (offer_slug, email) guards races.
+    try {
+      await prisma.offerEmailLog.create({
+        data: { offerSlug: slug, userId: r.userId, email: r.email, status: ok ? 'sent' : 'failed', error: ok ? null : 'send failed' },
+      });
+    } catch { /* already logged by a concurrent send — ignore */ }
+  }
+
+  await logAdmin({
+    adminUserId: req.auth!.userId,
+    action: 'offer.campaign_sent',
+    targetType: 'offer',
+    targetId: slug,
+    details: { audience: parsed.data.audience, plan: parsed.data.plan ?? null, matched: recipients.length, sent, failed },
+  });
+
+  res.json({ matched: recipients.length, sent, failed, capped: recipients.length >= SEND_CAP });
+});
+
+// Public one-click unsubscribe from campaign emails. The token is a signed,
+// long-lived HS256 JWT carrying the profile id; clicking sets an explicit
+// opt-out so future campaigns suppress the address. Renders a small HTML page.
+app.get('/api/unsubscribe', async (req, res) => {
+  const page = (title: string, body: string, ok = true) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title></head><body style="font-family:Inter,-apple-system,sans-serif;background:#f8fafc;margin:0;"><div style="max-width:440px;margin:12vh auto;padding:32px;background:#fff;border-radius:14px;border:1px solid #e2e8f0;text-align:center;"><h2 style="color:${ok ? '#294EA7' : '#dc2626'};margin:0 0 10px;">${title}</h2><p style="color:#475569;line-height:1.6;margin:0;">${body}</p></div></body></html>`;
+
+  const token = String(req.query.token || '');
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  if (!token || !jwtSecret) { res.status(400).send(page('Invalid link', 'This unsubscribe link is missing or malformed.', false)); return; }
+  try {
+    const payload = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] }) as { sub?: string; purpose?: string };
+    if (payload.purpose !== 'unsub' || !payload.sub) throw new Error('bad token');
+    await prisma.profile.update({
+      where: { id: payload.sub },
+      data: { marketingUnsubscribedAt: new Date(), marketingOptIn: false },
+    });
+    res.status(200).send(page("You're unsubscribed", 'You will no longer receive promotional emails from iinwentory. You can still get important account emails.'));
+  } catch {
+    res.status(400).send(page('Invalid or expired link', "We couldn't process this unsubscribe request. The link may have expired.", false));
+  }
+});
+
 // ── Platform Admin · KPI dashboard ────────────────────────────────────────────
 //
 // One round-trip of aggregate queries powering the operator Overview. Counts
@@ -2492,12 +2862,111 @@ app.post('/api/admin/jobs/low-stock-alerts', requireSuperAdminOrCron, async (req
 
 // ── Billing Routes ────────────────────────────────────────────────────────────
 
+// Resolves an offer slug (from a ?offer= link or a typed promo code) to a
+// redeemable Stripe coupon, enforcing the app-side rules Stripe can't:
+// active/expiry, allowed plans, and new-users-only eligibility. Shared by the
+// validate-offer preview route and checkout so both apply identical rules —
+// checkout never trusts the client's word that an offer is valid.
+type OfferResolution =
+  | { ok: true; couponId: string; slug: string; percentOff: number | null; amountOff: number | null; description: string | null }
+  | { ok: false; reason: string };
+
+async function resolveOffer(
+  teamId: string,
+  rawSlug: string,
+  planId: PlanId,
+  customerId: string | null,
+): Promise<OfferResolution> {
+  const slug = rawSlug.trim().toLowerCase();
+  if (!slug) return { ok: false, reason: 'No offer code provided' };
+
+  const offer = await prisma.offer.findUnique({ where: { slug } });
+  if (!offer || !offer.active) return { ok: false, reason: 'This code isn’t valid' };
+  if (offer.validUntil && offer.validUntil.getTime() < Date.now()) {
+    return { ok: false, reason: 'This offer has expired' };
+  }
+  if (!offer.allowedPlans.includes(planId)) {
+    return { ok: false, reason: 'This code doesn’t apply to the selected plan' };
+  }
+  if (offer.newUsersOnly && customerId && (await customerHasEverSubscribed(customerId))) {
+    return { ok: false, reason: 'This offer is only for new customers' };
+  }
+
+  const coupon = await getValidCoupon(offer.stripeCouponId);
+  if (!coupon) return { ok: false, reason: 'This offer is no longer available' };
+
+  return {
+    ok: true,
+    couponId: coupon.id,
+    slug,
+    percentOff: coupon.percentOff,
+    amountOff: coupon.amountOff,
+    description: offer.description ?? coupon.name,
+  };
+}
+
+// Public, unauthenticated display info for a promo slug — lets the marketing
+// pricing page show "30% off" in a banner. No eligibility check here (that's
+// per-user at checkout); this only reveals whether the code is live + its size.
+app.get('/api/offers/:slug', async (req, res) => {
+  const slug = String(req.params.slug || '').trim().toLowerCase();
+  if (!slug || slug.length > 64) { res.status(404).json({ error: 'Not found' }); return; }
+
+  const offer = await prisma.offer.findUnique({ where: { slug } });
+  if (!offer || !offer.active) { res.status(404).json({ error: 'Not found' }); return; }
+  if (offer.validUntil && offer.validUntil.getTime() < Date.now()) {
+    res.status(404).json({ error: 'Not found' }); return;
+  }
+
+  // Confirm the coupon is still redeemable when Stripe is configured; without
+  // it we can still surface the stored description.
+  const coupon = stripe ? await getValidCoupon(offer.stripeCouponId) : null;
+  if (stripe && !coupon) { res.status(404).json({ error: 'Not found' }); return; }
+
+  res.json({
+    slug: offer.slug,
+    description: offer.description ?? coupon?.name ?? null,
+    percentOff: coupon?.percentOff ?? null,
+    amountOff: coupon?.amountOff ?? null,
+    newUsersOnly: offer.newUsersOnly,
+  });
+});
+
+// Preview an offer before checkout so the UI can show "30% off applied ✓" (or
+// the rejection reason) without leaving the billing page.
+app.post('/api/billing/validate-offer', requireAuth, async (req, res) => {
+  if (!stripe) { res.status(503).json({ error: 'Stripe not configured' }); return; }
+
+  const schema = z.object({
+    offer: z.string().min(1).max(64),
+    planId: z.enum(['advanced', 'premium']),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: 'Invalid input' }); return; }
+
+  const teamId = req.auth!.teamId;
+  if (!teamId) { res.status(404).json({ error: 'Team not found' }); return; }
+
+  const billing = await prisma.teamBilling.findUnique({ where: { teamId } });
+  const result = await resolveOffer(teamId, parsed.data.offer, parsed.data.planId as PlanId, billing?.stripeCustomerId ?? null);
+
+  if (!result.ok) { res.json({ valid: false, reason: result.reason }); return; }
+  res.json({
+    valid: true,
+    slug: result.slug,
+    percentOff: result.percentOff,
+    amountOff: result.amountOff,
+    description: result.description,
+  });
+});
+
 app.post('/api/billing/checkout', requireAuth, async (req, res) => {
   if (!stripe) { res.status(503).json({ error: 'Stripe not configured' }); return; }
 
   const schema = z.object({
     planId: z.enum(['advanced', 'premium']),
     billing: z.enum(['monthly', 'yearly']),
+    offer: z.string().min(1).max(64).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: 'Invalid input' }); return; }
@@ -2530,7 +2999,16 @@ app.post('/api/billing/checkout', requireAuth, async (req, res) => {
   }
   if (!customerId) { res.status(500).json({ error: 'Failed to create Stripe customer' }); return; }
 
-  const url = await createCheckoutSession(customerId, priceId, teamId);
+  // Re-validate the offer server-side; a bad/ineligible code is ignored rather
+  // than blocking checkout, so the customer can still buy at full price.
+  let couponId: string | undefined;
+  let offerSlug: string | undefined;
+  if (parsed.data.offer) {
+    const resolved = await resolveOffer(teamId, parsed.data.offer, parsed.data.planId as PlanId, customerId);
+    if (resolved.ok) { couponId = resolved.couponId; offerSlug = resolved.slug; }
+  }
+
+  const url = await createCheckoutSession(customerId, priceId, teamId, { couponId, offerSlug });
   if (!url) { res.status(500).json({ error: 'Failed to create checkout session' }); return; }
   res.json({ url });
 });

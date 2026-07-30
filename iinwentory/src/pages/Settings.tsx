@@ -4,18 +4,29 @@ import { useStore } from '../store/useStore';
 import { useAuth } from '../store/useAuthStore';
 import { clearActivityLog } from '../store/activityLog';
 import { apiPost, apiDelete, setTokens } from '../lib/api';
+import { getStoredOffer, clearStoredOffer } from '../lib/offer';
 import { PLANS, type PlanId } from '../plans';
 import {
   User, Building2, Sliders, Database, Save, RotateCcw,
   Download, Upload, Trash2, Check, AlertTriangle, Tags as TagsIcon, ShieldAlert,
   CreditCard, ExternalLink, Sparkles, PanelLeftClose, PanelLeftOpen, Users as UsersIcon,
-  KeyRound,
+  KeyRound, TicketPercent, X,
 } from 'lucide-react';
 import HelpButton from '../components/HelpButton';
 import TagsManager from '../components/TagsManager';
 import Team from './Team';
 
 type SettingsTab = 'profile' | 'organization' | 'team' | 'preferences' | 'billing' | 'tags' | 'data';
+
+// Response of POST /api/billing/validate-offer.
+type ValidOffer = {
+  valid: true;
+  slug: string;
+  percentOff: number | null;
+  amountOff: number | null; // smallest currency unit (cents)
+  description: string | null;
+};
+type OfferValidation = ValidOffer | { valid: false; reason?: string };
 
 const tabList: { id: SettingsTab; label: string; icon: typeof User }[] = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -59,6 +70,14 @@ export default function Settings() {
   const [billingError, setBillingError] = useState('');
   const [billingBanner, setBillingBanner] = useState<'success' | 'cancelled' | null>(null);
 
+  // Promotional offer state. An offer is validated per plan (its allowedPlans
+  // may not include every tier), so we keep a valid-offer map keyed by plan.
+  const [offerCode, setOfferCode] = useState('');            // raw input field value
+  const [offerApplied, setOfferApplied] = useState<string | null>(null); // slug currently applied
+  const [offerByPlan, setOfferByPlan] = useState<Partial<Record<PlanId, ValidOffer>>>({});
+  const [offerReason, setOfferReason] = useState<string | null>(null);   // rejection message
+  const [offerBusy, setOfferBusy] = useState(false);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const flag = params.get('billing');
@@ -68,12 +87,29 @@ export default function Settings() {
       const url = window.location.pathname + (params.toString() ? `?${params}` : '');
       window.history.replaceState({}, '', url);
       if (flag === 'success') {
+        // Subscription created — the offer (if any) has been consumed.
+        clearStoredOffer();
         // Webhook fires roughly synchronously; poll a couple times so the new plan
         // appears even if the webhook is slightly delayed.
         void refreshOrgPlan();
         setTimeout(() => { void refreshOrgPlan(); }, 2500);
         setTimeout(() => { void refreshOrgPlan(); }, 7000);
       }
+    }
+
+    // Offer: prefer a ?offer=<slug> deep link, else fall back to one captured
+    // earlier in the funnel (localStorage). Strip the URL param, then validate
+    // so the discount shows before checkout.
+    const offerParam = params.get('offer');
+    if (offerParam) {
+      params.delete('offer');
+      const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : '');
+      window.history.replaceState({}, '', cleanUrl);
+    }
+    const offerSlug = offerParam ?? getStoredOffer();
+    if (offerSlug) {
+      setOfferCode(offerSlug);
+      void applyOffer(offerSlug);
     }
 
     // Marketing-site / post-register deep link: ?upgrade=<plan>&cycle=<monthly|yearly>
@@ -94,19 +130,23 @@ export default function Settings() {
       const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : '');
       window.history.replaceState({}, '', cleanUrl);
       setBillingCycle(cycle as 'monthly' | 'yearly');
-      // Defer one tick so React has applied the cycle change first.
-      setTimeout(() => { void startCheckout(upgrade as PlanId); }, 0);
+      // Defer one tick so React has applied the cycle change first. Pass the
+      // offer through explicitly — offerApplied state isn't set yet this tick.
+      setTimeout(() => { void startCheckout(upgrade as PlanId, offerParam ?? undefined); }, 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshOrgPlan]);
 
-  const startCheckout = async (planId: PlanId) => {
+  const startCheckout = async (planId: PlanId, offerSlug?: string) => {
     setBillingBusy(`${planId}_${billingCycle}`);
     setBillingError('');
     try {
       const data = await apiPost<{ url: string }>('/api/billing/checkout', {
         planId,
         billing: billingCycle,
+        // Server re-validates and silently ignores an offer that doesn't apply
+        // to this plan, so it's safe to always forward the applied slug.
+        ...(offerSlug ? { offer: offerSlug } : {}),
       });
       window.location.assign(data.url);
     } catch (err) {
@@ -114,6 +154,61 @@ export default function Settings() {
       setBillingBusy(null);
     }
   };
+
+  // Validate a promo code against both paid plans (an offer may be restricted to
+  // a subset), keeping the per-plan discount so the plan cards can reflect it.
+  const applyOffer = async (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+    setOfferBusy(true);
+    setOfferReason(null);
+    try {
+      const paidPlans = ['advanced', 'premium'] as const;
+      const results = await Promise.all(paidPlans.map(async (planId) => {
+        try {
+          const r = await apiPost<OfferValidation>('/api/billing/validate-offer', { offer: code, planId });
+          return [planId, r] as const;
+        } catch {
+          return [planId, { valid: false as const }] as const;
+        }
+      }));
+      const byPlan: Partial<Record<PlanId, ValidOffer>> = {};
+      let firstReason: string | null = null;
+      for (const [planId, r] of results) {
+        if (r.valid) byPlan[planId] = r;
+        else if (!firstReason && r.reason) firstReason = r.reason;
+      }
+      if (Object.keys(byPlan).length > 0) {
+        setOfferByPlan(byPlan);
+        setOfferApplied(code.toLowerCase());
+        setOfferReason(null);
+      } else {
+        setOfferByPlan({});
+        setOfferApplied(null);
+        setOfferReason(firstReason ?? 'This code isn’t valid');
+      }
+    } finally {
+      setOfferBusy(false);
+    }
+  };
+
+  const clearOffer = () => {
+    setOfferCode('');
+    setOfferApplied(null);
+    setOfferByPlan({});
+    setOfferReason(null);
+  };
+
+  // Discounted monthly price for a plan card given the applied offer, or null
+  // if no offer applies to that plan. Display only — Stripe computes the charge.
+  const discountedPrice = (planId: PlanId, price: number): number | null => {
+    const o = offerByPlan[planId];
+    if (!o) return null;
+    if (o.percentOff) return price * (1 - o.percentOff / 100);
+    if (o.amountOff) return Math.max(0, price - o.amountOff / 100);
+    return null;
+  };
+  const fmtPrice = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
   const openPortal = async () => {
     setBillingBusy('portal');
@@ -536,6 +631,70 @@ export default function Settings() {
               </div>
             )}
 
+            {/* Promo code */}
+            {plan.id !== 'enterprise' && (() => {
+              const applied = offerByPlan.advanced ?? offerByPlan.premium;
+              const isApplied = !!offerApplied && !!applied;
+              const badge = applied
+                ? (applied.percentOff ? `${applied.percentOff}% off` : applied.amountOff ? `$${(applied.amountOff / 100).toFixed(2)} off` : 'Discount applied')
+                : '';
+              return (
+                <div className="card" style={{ padding: '14px 16px', cursor: 'default' }}>
+                  {isApplied ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                        fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '20px',
+                        background: '#ecfdf5', color: '#065f46', border: '1px solid #6ee7b7',
+                      }}>
+                        <Check size={13} /> {(offerApplied || '').toUpperCase()} · {badge}
+                      </span>
+                      <span style={{ fontSize: '12.5px', color: 'var(--text-medium)' }}>
+                        {applied?.description || 'Discount will be applied at checkout.'}
+                      </span>
+                      <button
+                        onClick={clearOffer}
+                        className="btn-outline"
+                        style={{ marginLeft: 'auto', fontSize: '12px', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                      >
+                        <X size={12} /> Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-medium)', display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
+                        <TicketPercent size={15} color="var(--primary)" /> Have a promo code?
+                      </label>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <input
+                          className="input"
+                          value={offerCode}
+                          onChange={e => { setOfferCode(e.target.value); if (offerReason) setOfferReason(null); }}
+                          onKeyDown={e => { if (e.key === 'Enter' && !offerBusy) void applyOffer(offerCode); }}
+                          placeholder="e.g. WELCOME30"
+                          autoCapitalize="characters"
+                          style={{ flex: '1 1 180px', maxWidth: '260px' }}
+                        />
+                        <button
+                          className="btn-outline"
+                          onClick={() => void applyOffer(offerCode)}
+                          disabled={offerBusy || !offerCode.trim()}
+                          style={{ fontSize: '13px', padding: '9px 16px', opacity: (offerBusy || !offerCode.trim()) ? 0.6 : 1 }}
+                        >
+                          {offerBusy ? 'Checking…' : 'Apply'}
+                        </button>
+                      </div>
+                      {offerReason && (
+                        <span style={{ fontSize: '12.5px', color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <AlertTriangle size={13} /> {offerReason}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Plan grid */}
             <div style={{
               display: 'grid',
@@ -592,7 +751,17 @@ export default function Settings() {
                         )}
                       </div>
                       <div style={{ marginTop: '10px' }}>
-                        <span style={{ fontSize: '24px', fontWeight: 800 }}>${price}</span>
+                        {(() => {
+                          const discounted = discountedPrice(planId, price);
+                          return discounted !== null ? (
+                            <>
+                              <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-muted)', textDecoration: 'line-through', marginRight: '6px' }}>${price}</span>
+                              <span style={{ fontSize: '24px', fontWeight: 800, color: p.color }}>${fmtPrice(discounted)}</span>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: '24px', fontWeight: 800 }}>${price}</span>
+                          );
+                        })()}
                         <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '4px' }}>
                           / month{billingCycle === 'yearly' ? ', billed yearly' : ''}
                         </span>
@@ -611,7 +780,7 @@ export default function Settings() {
                       </ul>
                       <button
                         className="btn-primary"
-                        onClick={() => { if (isHigher) startCheckout(planId); }}
+                        onClick={() => { if (isHigher) startCheckout(planId, offerApplied ?? undefined); }}
                         disabled={inactive || busy || billingBusy !== null}
                         title={isLower ? 'Downgrades are handled through Manage subscription' : undefined}
                         style={{

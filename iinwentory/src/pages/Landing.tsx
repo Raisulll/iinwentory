@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import '../components/landing/landing.css';
+import { captureOfferFromUrl } from '../lib/offer';
 import { useReveal } from '../components/landing/useReveal';
 import MarketingNav from '../components/landing/MarketingNav';
 import HeroSection from '../components/landing/HeroSection';
@@ -18,6 +19,8 @@ export default function Landing() {
 
   useEffect(() => {
     document.title = 'iinwentory — Smart Inventory Management for Modern Businesses';
+    // Persist any ?offer= from a marketing link so it survives register → checkout.
+    captureOfferFromUrl();
   }, []);
 
   return (
