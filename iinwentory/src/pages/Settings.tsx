@@ -3,8 +3,9 @@ import { useSettings } from '../store/useSettingsStore';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../store/useAuthStore';
 import { clearActivityLog } from '../store/activityLog';
-import { apiPost, apiDelete, setTokens } from '../lib/api';
+import { apiGet, apiPost, apiDelete, setTokens } from '../lib/api';
 import { getStoredOffer, clearStoredOffer } from '../lib/offer';
+import { confirmDialog, alertDialog } from '../components/ConfirmDialog';
 import { PLANS, type PlanId } from '../plans';
 import {
   User, Building2, Sliders, Database, Save, RotateCcw,
@@ -28,6 +29,20 @@ type ValidOffer = {
 };
 type OfferValidation = ValidOffer | { valid: false; reason?: string };
 
+// A row of GET /api/billing/history — one Stripe invoice.
+type Invoice = {
+  id: string;
+  number: string | null;
+  created: number;     // unix seconds
+  amountPaid: number;  // cents
+  amountDue: number;   // cents
+  currency: string;
+  status: string | null;
+  description: string | null;
+  hostedInvoiceUrl: string | null;
+  invoicePdf: string | null;
+};
+
 const tabList: { id: SettingsTab; label: string; icon: typeof User }[] = [
   { id: 'profile', label: 'Profile', icon: User },
   { id: 'organization', label: 'Organization', icon: Building2 },
@@ -43,12 +58,15 @@ export default function Settings() {
   const store = useStore();
   const { logout, org, plan, refreshOrgPlan } = useAuth();
 
-  // Default to billing tab when Stripe redirects back with ?billing=...
-  // or when the marketing site sends a user with ?upgrade=<plan>.
+  // Open the tab named by ?tab=<id> (e.g. the /team → ?tab=team redirect), and
+  // default to billing when Stripe redirects back with ?billing=…, the marketing
+  // site sends ?upgrade=<plan>, or an offer email deep-links with ?offer=<slug>.
   const initialTab = ((): SettingsTab => {
     if (typeof window === 'undefined') return 'profile';
     const params = new URLSearchParams(window.location.search);
-    if (params.get('billing') || params.get('upgrade')) return 'billing';
+    const tab = params.get('tab');
+    if (tab && tabList.some(t => t.id === tab)) return tab as SettingsTab;
+    if (params.get('billing') || params.get('upgrade') || params.get('offer')) return 'billing';
     return 'profile';
   })();
 
@@ -70,6 +88,10 @@ export default function Settings() {
   const [billingError, setBillingError] = useState('');
   const [billingBanner, setBillingBanner] = useState<'success' | 'cancelled' | null>(null);
 
+  // Purchase history (Stripe invoices). null = not loaded yet.
+  const [history, setHistory] = useState<Invoice[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   // Promotional offer state. An offer is validated per plan (its allowedPlans
   // may not include every tier), so we keep a valid-offer map keyed by plan.
   const [offerCode, setOfferCode] = useState('');            // raw input field value
@@ -89,9 +111,14 @@ export default function Settings() {
       if (flag === 'success') {
         // Subscription created — the offer (if any) has been consumed.
         clearStoredOffer();
-        // Webhook fires roughly synchronously; poll a couple times so the new plan
-        // appears even if the webhook is slightly delayed.
-        void refreshOrgPlan();
+        // Reconcile straight from Stripe first: the webhook flips the plan in
+        // prod but can lag and never reaches localhost in dev. Then refresh the
+        // local plan state, with a couple of retries as a belt-and-braces guard.
+        void (async () => {
+          try { await apiPost('/api/billing/sync', {}); } catch { /* webhook will catch up */ }
+          await refreshOrgPlan();
+          setHistory(null); // force purchase history to refetch with the new invoice
+        })();
         setTimeout(() => { void refreshOrgPlan(); }, 2500);
         setTimeout(() => { void refreshOrgPlan(); }, 7000);
       }
@@ -136,6 +163,17 @@ export default function Settings() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshOrgPlan]);
+
+  // Load purchase history the first time the billing tab is opened (and again
+  // whenever it's been invalidated by setHistory(null), e.g. after a purchase).
+  useEffect(() => {
+    if (activeTab !== 'billing' || history !== null) return;
+    setHistoryLoading(true);
+    apiGet<{ invoices: Invoice[] }>('/api/billing/history')
+      .then(d => setHistory(d.invoices))
+      .catch(() => setHistory([]))
+      .finally(() => setHistoryLoading(false));
+  }, [activeTab, history]);
 
   const startCheckout = async (planId: PlanId, offerSlug?: string) => {
     setBillingBusy(`${planId}_${billingCycle}`);
@@ -269,8 +307,12 @@ export default function Settings() {
     }
   };
 
-  const handleReset = () => {
-    if (!confirm('Reset all settings to defaults?')) return;
+  const handleReset = async () => {
+    if (!await confirmDialog({
+      title: 'Reset settings?',
+      message: 'This restores all preferences on this page to their defaults. Your inventory data is not affected.',
+      confirmText: 'Reset to defaults',
+    })) return;
     resetSettings();
     setOrgName('My Organization');
     setUserName('Account Owner');
@@ -309,7 +351,12 @@ export default function Settings() {
           setImportError('Invalid backup file. Expected items, folders, and tags.');
           return;
         }
-        if (!confirm(`Import ${data.items.length} items, ${data.folders.length} folders, ${data.tags.length} tags? This will REPLACE all current data.`)) return;
+        if (!await confirmDialog({
+          title: 'Replace all data?',
+          message: `Import ${data.items.length} items, ${data.folders.length} folders, and ${data.tags.length} tags? This will REPLACE all current data.`,
+          confirmText: 'Import & replace',
+          tone: 'danger',
+        })) return;
         await apiPost('/api/data/import', {
           items: data.items,
           folders: data.folders,
@@ -330,7 +377,7 @@ export default function Settings() {
       clearActivityLog();
       window.location.reload();
     } catch (err) {
-      alert('Failed to clear data: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      void alertDialog({ title: 'Could not clear data', message: err instanceof Error ? err.message : 'Unknown error', tone: 'danger' });
     }
   };
 
@@ -814,6 +861,65 @@ export default function Settings() {
               Payments are processed securely by Stripe. After clicking Upgrade you'll be redirected to a Stripe-hosted checkout page.
               You can cancel or change plans anytime via <b>Manage subscription</b> above.
             </div>
+
+            {/* Purchase history */}
+            {(historyLoading || (history && history.length > 0)) && (
+              <div className="card" style={{ padding: '20px 22px', cursor: 'default' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 4px' }}>Purchase history</h3>
+                <p style={{ ...hintStyle, marginBottom: '14px' }}>Your past invoices and receipts, most recent first.</p>
+                {historyLoading ? (
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Loading…</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {history!.map(inv => {
+                      const money = new Intl.NumberFormat(undefined, {
+                        style: 'currency', currency: (inv.currency || 'usd').toUpperCase(),
+                      }).format((inv.amountPaid || inv.amountDue) / 100);
+                      const date = new Date(inv.created * 1000).toLocaleDateString(undefined, {
+                        year: 'numeric', month: 'short', day: 'numeric',
+                      });
+                      const paid = inv.status === 'paid';
+                      const open = inv.status === 'open';
+                      return (
+                        <div key={inv.id} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          gap: '12px', padding: '11px 0', flexWrap: 'wrap',
+                          borderTop: '1px solid var(--border-color)',
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600 }}>{date}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '260px' }}>
+                              {inv.description || inv.number || 'Subscription'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700 }}>{money}</span>
+                            {inv.status && (
+                              <span style={{
+                                fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px',
+                                padding: '2px 8px', borderRadius: '20px',
+                                background: paid ? '#dcfce7' : open ? '#fef3c7' : '#f3f4f6',
+                                color: paid ? '#16a34a' : open ? '#b45309' : '#6b7280',
+                              }}>{inv.status}</span>
+                            )}
+                            {inv.hostedInvoiceUrl && (
+                              <a
+                                href={inv.hostedInvoiceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                              >
+                                <ExternalLink size={12} /> View
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Plus, X, Edit2, Trash2, Tag, Check } from 'lucide-react';
+import { confirmDialog } from './ConfirmDialog';
 
 const TAG_COLORS = ['#294EA7', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#64748b'];
 
@@ -38,8 +39,8 @@ export default function TagsManager({ showHeader = true }: TagsManagerProps) {
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this tag?')) void store.deleteTag(id);
+  const handleDelete = async (id: string) => {
+    if (await confirmDialog({ title: 'Delete tag?', message: 'Delete this tag? Items keep their other tags.', confirmText: 'Delete', tone: 'danger' })) void store.deleteTag(id);
   };
 
   const getItemCount = (tagId: string) => store.items.filter(i => i.tags.includes(tagId)).length;

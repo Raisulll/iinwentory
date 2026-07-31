@@ -179,6 +179,37 @@ async function setTeamPlan(
   ]);
 }
 
+// Stripe's subscription.status strings → the app's own status enum. Shared by
+// the webhook and the on-return reconcile path.
+const STRIPE_STATUS_MAP: Record<string, 'active' | 'trialing' | 'past_due' | 'cancelled'> = {
+  active: 'active', trialing: 'trialing', past_due: 'past_due',
+  canceled: 'cancelled', unpaid: 'past_due', incomplete: 'past_due',
+  incomplete_expired: 'cancelled', paused: 'past_due',
+};
+
+// Reads the customer's current subscription straight from Stripe and writes the
+// resulting plan to our DB. The webhook is the primary path, but it can lag and
+// never reaches localhost in dev — so the client calls this on return from
+// Checkout as a fallback. Only writes when a live subscription exists, so it
+// never clobbers a manually-granted plan (e.g. an admin comp) down to free.
+async function syncSubscriptionForTeam(teamId: string, customerId: string): Promise<PlanId | null> {
+  if (!stripe) return null;
+  const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
+  const live = subs.data.find(s => ['active', 'trialing', 'past_due'].includes(s.status));
+  if (!live) return null;
+  const priceId = live.items.data[0]?.price.id;
+  const planId = (priceId ? planIdFromPriceId(priceId) : null) ?? 'free';
+  const periodEndSec = (live as unknown as { current_period_end?: number }).current_period_end;
+  await setTeamPlan(teamId, planId, {
+    stripeSubscriptionId: live.id,
+    stripePriceId: priceId ?? null,
+    status: STRIPE_STATUS_MAP[live.status] ?? 'active',
+    currentPeriodEnd: periodEndSec ? new Date(periodEndSec * 1000) : null,
+    cancelAtPeriodEnd: live.cancel_at_period_end ?? null,
+  });
+  return planId as PlanId;
+}
+
 // ── Helpers / serializers ─────────────────────────────────────────────────────
 
 function decimalToNumber(d: Prisma.Decimal | null | undefined): number | null {
@@ -2348,13 +2379,20 @@ const SEND_CAP = 2000; // hard ceiling per send, so an admin click can't fan out
 
 const audienceSchema = z.object({
   audience: z.enum(['new_users', 'existing_subscribers', 'plan', 'everyone']),
+  // Recipient granularity within the matched teams:
+  //  - 'team_owners': one contact per team (the highest-privileged member).
+  //  - 'all_users':  every individual member of every matched team.
+  // Defaults to 'team_owners' so an older client (no scope) keeps prior behavior.
+  scope: z.enum(['all_users', 'team_owners']).default('team_owners'),
   plan: z.enum(PLAN_IDS as unknown as [string, ...string[]]).optional(),
   signupFrom: z.string().datetime().nullable().optional(),
   signupTo: z.string().datetime().nullable().optional(),
 });
 type AudienceParams = z.infer<typeof audienceSchema>;
 
-// Resolves the audience to a deduped list of {userId, email} account owners.
+// Resolves the audience to a deduped list of {userId, email}. Granularity
+// depends on p.scope: 'team_owners' returns one contact per team, 'all_users'
+// returns every individual member of every matched team (deduped per person).
 async function resolveAudienceRecipients(
   slug: string,
   p: AudienceParams,
@@ -2378,9 +2416,17 @@ async function resolveAudienceRecipients(
   }
 
   const limitClause = opts.limit > 0 ? `LIMIT ${add(opts.limit)}` : '';
+  // 'team_owners' collapses each team to its highest-privileged member via
+  // DISTINCT ON; 'all_users' keeps every member row (the outer GROUP BY still
+  // dedupes a person who belongs to more than one matched team).
+  const perTeam = p.scope !== 'all_users';
+  const distinctOn = perTeam ? 'DISTINCT ON (t.id)' : '';
+  const pickOwner = perTeam
+    ? `ORDER BY t.id, CASE tm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END`
+    : '';
   const sql = `
     SELECT user_id::text AS "userId", email FROM (
-      SELECT DISTINCT ON (t.id)
+      SELECT ${distinctOn}
         tm.user_id AS user_id,
         lower(u.email) AS email
       FROM public.teams t
@@ -2389,7 +2435,7 @@ async function resolveAudienceRecipients(
       JOIN auth.users u ON u.id = tm.user_id
       LEFT JOIN public.team_billing tb ON tb.team_id = t.id
       WHERE ${conds.join(' AND ')}
-      ORDER BY t.id, CASE tm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END
+      ${pickOwner}
     ) q
     GROUP BY user_id, email
     ${limitClause}`;
@@ -2862,6 +2908,23 @@ app.post('/api/admin/jobs/low-stock-alerts', requireSuperAdminOrCron, async (req
 
 // ── Billing Routes ────────────────────────────────────────────────────────────
 
+// Stripe redirect URLs should send the user back to whichever frontend actually
+// started checkout (localhost in dev, the prod domain in prod) rather than a
+// fixed FRONTEND_URL entry — otherwise a checkout begun on localhost lands on
+// the deployed site. We trust the request Origin only after validating it
+// against the same allow-list CORS uses, so it can't be spoofed into an open
+// redirect. Falls back to the first configured FRONTEND_URL when absent.
+function redirectBaseFromReq(origin: string | undefined): string {
+  if (origin) {
+    try {
+      if (allowedOrigins.includes(origin) || /\.vercel\.app$/.test(new URL(origin).hostname)) {
+        return origin;
+      }
+    } catch { /* malformed Origin header — fall through to the default */ }
+  }
+  return allowedOrigins[0];
+}
+
 // Resolves an offer slug (from a ?offer= link or a typed promo code) to a
 // redeemable Stripe coupon, enforcing the app-side rules Stripe can't:
 // active/expiry, allowed plans, and new-users-only eligibility. Shared by the
@@ -3008,9 +3071,52 @@ app.post('/api/billing/checkout', requireAuth, async (req, res) => {
     if (resolved.ok) { couponId = resolved.couponId; offerSlug = resolved.slug; }
   }
 
-  const url = await createCheckoutSession(customerId, priceId, teamId, { couponId, offerSlug });
+  const baseUrl = redirectBaseFromReq(req.headers.origin);
+  const url = await createCheckoutSession(customerId, priceId, teamId, { couponId, offerSlug, baseUrl });
   if (!url) { res.status(500).json({ error: 'Failed to create checkout session' }); return; }
   res.json({ url });
+});
+
+// Reconcile the team's plan with Stripe on demand. The client calls this when it
+// returns from Checkout (?billing=success) so the new plan lands immediately,
+// without waiting on — or, in local dev, depending on — the webhook.
+app.post('/api/billing/sync', requireAuth, async (req, res) => {
+  if (!stripe) { res.status(503).json({ error: 'Stripe not configured' }); return; }
+  const teamId = req.auth!.teamId;
+  if (!teamId) { res.status(404).json({ error: 'Team not found' }); return; }
+  const billing = await prisma.teamBilling.findUnique({ where: { teamId } });
+  if (!billing?.stripeCustomerId) { res.json({ synced: false, planId: null }); return; }
+  const planId = await syncSubscriptionForTeam(teamId, billing.stripeCustomerId);
+  res.json({ synced: planId !== null, planId });
+});
+
+// Read-only purchase history for the current team: the customer's Stripe
+// invoices, most recent first, with links to Stripe-hosted receipts/PDFs.
+app.get('/api/billing/history', requireAuth, async (req, res) => {
+  if (!stripe) { res.json({ invoices: [] }); return; }
+  const teamId = req.auth!.teamId;
+  if (!teamId) { res.status(404).json({ error: 'Team not found' }); return; }
+  const billing = await prisma.teamBilling.findUnique({ where: { teamId } });
+  if (!billing?.stripeCustomerId) { res.json({ invoices: [] }); return; }
+
+  const list = await stripe.invoices.list({ customer: billing.stripeCustomerId, limit: 24 });
+  // Skip $0 draft/placeholder invoices Stripe sometimes opens for trials — they
+  // aren't a purchase the user cares to see. Anything charged or finalized stays.
+  const invoices = list.data
+    .filter(inv => inv.status && inv.status !== 'draft')
+    .map(inv => ({
+      id: inv.id,
+      number: inv.number ?? null,
+      created: inv.created,                      // unix seconds
+      amountPaid: inv.amount_paid,               // smallest currency unit (cents)
+      amountDue: inv.amount_due,
+      currency: inv.currency,
+      status: inv.status,                        // 'paid' | 'open' | 'void' | 'uncollectible'
+      description: inv.lines?.data?.[0]?.description ?? null,
+      hostedInvoiceUrl: inv.hosted_invoice_url ?? null,
+      invoicePdf: inv.invoice_pdf ?? null,
+    }));
+  res.json({ invoices });
 });
 
 app.post('/api/billing/portal', requireAuth, async (req, res) => {
@@ -3021,7 +3127,7 @@ app.post('/api/billing/portal', requireAuth, async (req, res) => {
   const billing = await prisma.teamBilling.findUnique({ where: { teamId } });
   if (!billing?.stripeCustomerId) { res.status(400).json({ error: 'No billing account found' }); return; }
 
-  const url = await createPortalSession(billing.stripeCustomerId);
+  const url = await createPortalSession(billing.stripeCustomerId, redirectBaseFromReq(req.headers.origin));
   if (!url) { res.status(500).json({ error: 'Failed to create portal session' }); return; }
   res.json({ url });
 });
@@ -3052,17 +3158,11 @@ app.post('/api/billing/webhook', async (req, res) => {
       if (!teamId) break;
       const priceId = sub.items.data[0]?.price.id;
       const planId = (planIdFromPriceId(priceId) ?? 'free') as PlanId;
-      // Stripe subscription status values match the strings the app expects.
-      const statusMap: Record<string, 'active' | 'trialing' | 'past_due' | 'cancelled'> = {
-        active: 'active', trialing: 'trialing', past_due: 'past_due',
-        canceled: 'cancelled', unpaid: 'past_due', incomplete: 'past_due',
-        incomplete_expired: 'cancelled', paused: 'past_due',
-      };
       const periodEndSec = (sub as unknown as { current_period_end?: number }).current_period_end;
       await setTeamPlan(teamId, planId, {
         stripeSubscriptionId: sub.id,
         stripePriceId: priceId,
-        status: statusMap[sub.status] ?? 'active',
+        status: STRIPE_STATUS_MAP[sub.status] ?? 'active',
         currentPeriodEnd: periodEndSec ? new Date(periodEndSec * 1000) : null,
         cancelAtPeriodEnd: sub.cancel_at_period_end ?? null,
       });

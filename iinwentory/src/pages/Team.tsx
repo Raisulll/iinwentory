@@ -4,6 +4,7 @@ import { useSettings } from '../store/useSettingsStore';
 import { useAuth } from '../store/useAuthStore';
 import type { TeamMemberRole, TeamInvite } from '../types';
 import { apiPost } from '../lib/api';
+import { confirmDialog, alertDialog } from '../components/ConfirmDialog';
 import { Crown, Shield, User, UserCheck, Plus, Copy, Trash2, Share2, Check, LogIn, AlertTriangle, Users as UsersIcon } from 'lucide-react';
 import HelpButton from '../components/HelpButton';
 
@@ -135,7 +136,7 @@ export default function Team() {
       setEmailedTo(invite.emailed ? email : null);
       setPopupInvite(invite);
       setInviteEmail('');
-    } catch (e) { alert(e instanceof Error ? e.message : 'Create invite failed'); }
+    } catch (e) { void alertDialog({ title: 'Invite failed', message: e instanceof Error ? e.message : 'Create invite failed', tone: 'danger' }); }
   };
 
   const changeRole = async (userId: string, role: 'admin' | 'member' | 'client') => {
@@ -143,14 +144,19 @@ export default function Team() {
     // rolls back on failure, so the picker updates the instant you click.
     try {
       await updateMemberRole(userId, role);
-    } catch (e) { alert(e instanceof Error ? e.message : 'Role change failed'); }
+    } catch (e) { void alertDialog({ title: 'Role change failed', message: e instanceof Error ? e.message : 'Role change failed', tone: 'danger' }); }
   };
 
   const removeMember = async (userId: string) => {
-    if (!confirm('Remove this member from the team?')) return;
+    if (!await confirmDialog({
+      title: 'Remove member?',
+      message: 'They will immediately lose access to this team and its inventory. You can re-invite them later.',
+      confirmText: 'Remove member',
+      tone: 'danger',
+    })) return;
     try {
       await removeMemberFromTeam(userId);
-    } catch (e) { alert(e instanceof Error ? e.message : 'Remove failed'); }
+    } catch (e) { void alertDialog({ title: 'Remove failed', message: e instanceof Error ? e.message : 'Remove failed', tone: 'danger' }); }
   };
 
   const copyCode = async (code: string) => {

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPatch } from '../../lib/api';
 import { useDebounce } from '../../lib/useDebounce';
+import { alertDialog } from '../../components/ConfirmDialog';
 
 // Mirrors the four values allowed by the feedback.status CHECK constraint.
 type FeedbackStatus = 'new' | 'reviewed' | 'resolved' | 'archived';
@@ -163,7 +164,7 @@ export default function AdminFeedback() {
         [next]: Math.max(0, (prev[next] ?? 0) - 1),
         [prevStatus]: (prev[prevStatus] ?? 0) + 1,
       }));
-      alert(e instanceof Error ? e.message : 'Status update failed');
+      void alertDialog({ title: 'Update failed', message: e instanceof Error ? e.message : 'Status update failed', tone: 'danger' });
     } finally {
       setBusyId(null);
     }

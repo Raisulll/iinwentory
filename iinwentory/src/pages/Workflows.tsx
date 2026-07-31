@@ -18,6 +18,7 @@ import {
   Send, AlertTriangle, User, CheckCircle2, MapPin, Search as SearchIcon,
 } from 'lucide-react';
 import HelpButton from '../components/HelpButton';
+import { confirmDialog, alertDialog } from '../components/ConfirmDialog';
 
 type WorkflowTab = 'pick-lists' | 'purchase-orders' | 'stock-counts';
 type PickListFilterTab = 'active' | 'draft' | 'ready' | 'history';
@@ -378,9 +379,9 @@ function PickLists() {
     }
   };
 
-  const handleDelete = (pl: PickList) => {
-    if (!confirm(`Delete pick list "${pl.name}"?`)) return;
-    wf.deletePickList(pl.id).catch(e => alert(e.message));
+  const handleDelete = async (pl: PickList) => {
+    if (!await confirmDialog({ title: 'Delete pick list?', message: `Delete pick list "${pl.name}"?`, confirmText: 'Delete', tone: 'danger' })) return;
+    wf.deletePickList(pl.id).catch(e => void alertDialog({ title: 'Delete failed', message: e instanceof Error ? e.message : String(e), tone: 'danger' }));
     if (selectedId === pl.id) setSelectedId(null);
   };
 
@@ -410,25 +411,25 @@ function PickLists() {
       await wf.addComment(selected.id, newComment.trim());
       setNewComment('');
       await loadCommentsIssues();
-    } catch (e) { alert(e instanceof Error ? e.message : 'Comment failed'); }
+    } catch (e) { void alertDialog({ title: 'Comment failed', message: e instanceof Error ? e.message : 'Comment failed', tone: 'danger' }); }
   };
 
   const handleDeleteComment = async (commentId: string) => {
     if (!selected) return;
-    if (!confirm('Delete comment?')) return;
+    if (!await confirmDialog({ title: 'Delete comment?', message: 'Delete comment?', confirmText: 'Delete', tone: 'danger' })) return;
     try {
       await wf.deleteComment(selected.id, commentId);
       await loadCommentsIssues();
-    } catch (e) { alert(e instanceof Error ? e.message : 'Delete failed'); }
+    } catch (e) { void alertDialog({ title: 'Delete failed', message: e instanceof Error ? e.message : 'Delete failed', tone: 'danger' }); }
   };
 
   const handleDeleteIssue = async (issueId: string) => {
     if (!selected) return;
-    if (!confirm('Delete issue?')) return;
+    if (!await confirmDialog({ title: 'Delete issue?', message: 'Delete issue?', confirmText: 'Delete', tone: 'danger' })) return;
     try {
       await wf.deleteIssue(selected.id, issueId);
       await loadCommentsIssues();
-    } catch (e) { alert(e instanceof Error ? e.message : 'Delete failed'); }
+    } catch (e) { void alertDialog({ title: 'Delete failed', message: e instanceof Error ? e.message : 'Delete failed', tone: 'danger' }); }
   };
 
   const copyCode = (code: string) => { void navigator.clipboard?.writeText(code); };
@@ -598,7 +599,7 @@ function PickLists() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 {selected.status === 'draft' && !isClient && (
                   <button className="btn-primary" style={{ fontSize: '12px', padding: '7px 14px', background: '#3b82f6' }}
-                    onClick={() => wf.markReady(selected.id).catch(e => alert(e.message))}
+                    onClick={() => wf.markReady(selected.id).catch(e => void alertDialog({ title: 'Action failed', message: e instanceof Error ? e.message : String(e), tone: 'danger' }))}
                     disabled={selected.items.length === 0}
                     title={selected.items.length === 0 ? 'Add at least one item first' : 'Mark ready to pick'}>
                     <Play size={13} /> Mark Ready
@@ -608,9 +609,9 @@ function PickLists() {
                   <>
                     {selected.items.every(it => it.pickedQty === 0) && (
                       <button className="btn-outline" style={{ fontSize: '12px', padding: '7px 12px' }}
-                        onClick={() => {
-                          if (!confirm('Move this pick list back to draft? You\'ll be able to edit items again.')) return;
-                          wf.unmarkReady(selected.id).catch(e => alert(e.message));
+                        onClick={async () => {
+                          if (!await confirmDialog({ title: 'Move to draft?', message: 'Move this pick list back to draft? You\'ll be able to edit items again.', confirmText: 'Move to draft', tone: 'danger' })) return;
+                          wf.unmarkReady(selected.id).catch(e => void alertDialog({ title: 'Action failed', message: e instanceof Error ? e.message : String(e), tone: 'danger' }));
                         }}
                         title="Revert to draft (only available before any picks have happened)">
                         <FileText size={13} /> Back to Draft
@@ -621,18 +622,22 @@ function PickLists() {
                       background: hasPicks ? '#22c55e' : '#f59e0b',
                       boxShadow: hasPicks ? undefined : '0 0 0 3px rgba(245, 158, 11, 0.20)',
                     }}
-                      onClick={() => {
+                      onClick={async () => {
                         if (!hasPicks) {
-                          const proceed = confirm(
-                            `⚠ No items have been picked yet on "${selected.name}".\n\n` +
-                            `Marking it complete now will lock it with 0 / ${requestedTotal} units picked. ` +
-                            `This cannot be undone.\n\nAre you sure you want to complete an empty pick list?`
-                          );
+                          const proceed = await confirmDialog({
+                            title: 'Complete empty pick list?',
+                            message:
+                              `⚠ No items have been picked yet on "${selected.name}".\n\n` +
+                              `Marking it complete now will lock it with 0 / ${requestedTotal} units picked. ` +
+                              `This cannot be undone.\n\nAre you sure you want to complete an empty pick list?`,
+                            confirmText: 'Complete',
+                            tone: 'danger',
+                          });
                           if (!proceed) return;
-                        } else if (!confirm('Mark this pick list as completed? This cannot be undone — the list will become read-only.')) {
+                        } else if (!await confirmDialog({ title: 'Complete pick list?', message: 'Mark this pick list as completed? This cannot be undone — the list will become read-only.', confirmText: 'Complete', tone: 'danger' })) {
                           return;
                         }
-                        wf.completePickList(selected.id).catch(e => alert(e.message));
+                        wf.completePickList(selected.id).catch(e => void alertDialog({ title: 'Action failed', message: e instanceof Error ? e.message : String(e), tone: 'danger' }));
                       }}
                       title={hasPicks
                         ? 'Lock this pick list as completed (irreversible)'
@@ -674,7 +679,7 @@ function PickLists() {
                         value={selected.assignedTo ?? ''}
                         onChange={e => {
                           const val = e.target.value || null;
-                          wf.updatePickList(selected.id, { assignedTo: val }).catch(err => alert(err.message));
+                          wf.updatePickList(selected.id, { assignedTo: val }).catch(err => void alertDialog({ title: 'Update failed', message: err instanceof Error ? err.message : String(err), tone: 'danger' }));
                         }}
                         style={{
                           fontSize: '13px', fontWeight: 600, color: 'var(--text-dark)',
@@ -874,8 +879,8 @@ function PickLists() {
                                   disabled={pi.requestedQty >= stock}
                                   title={pi.requestedQty >= stock ? `Only ${stock} in stock` : 'Increase quantity'}
                                   onClick={() => {
-                                    if (pi.requestedQty >= stock) { alert(`Only ${stock} in stock`); return; }
-                                    wf.updatePickListItem(selected.id, pi.itemId, { requestedQty: pi.requestedQty + 1 }).catch(e => alert(e.message));
+                                    if (pi.requestedQty >= stock) { void alertDialog({ title: 'Out of stock', message: `Only ${stock} in stock`, tone: 'danger' }); return; }
+                                    wf.updatePickListItem(selected.id, pi.itemId, { requestedQty: pi.requestedQty + 1 }).catch(e => void alertDialog({ title: 'Update failed', message: e instanceof Error ? e.message : String(e), tone: 'danger' }));
                                   }}>
                                   <Plus size={13} />
                                 </button>
@@ -1092,13 +1097,13 @@ function PurchaseOrders() {
       setNewSupplier(''); setNewNotes('');
       setShowCreate(false);
       setSelectedId(po.id);
-    } catch (e) { alert(e instanceof Error ? e.message : 'Create failed'); }
+    } catch (e) { void alertDialog({ title: 'Create failed', message: e instanceof Error ? e.message : 'Create failed', tone: 'danger' }); }
   };
 
   const handleReceive = async (po: PurchaseOrder) => {
-    if (!confirm('Mark as received? Ordered quantities will be added to inventory.')) return;
+    if (!await confirmDialog({ title: 'Mark received?', message: 'Mark as received? Ordered quantities will be added to inventory.', confirmText: 'Mark received', tone: 'danger' })) return;
     try { await wf.receivePO(po.id); }
-    catch (e) { alert(e instanceof Error ? e.message : 'Receive failed'); }
+    catch (e) { void alertDialog({ title: 'Receive failed', message: e instanceof Error ? e.message : 'Receive failed', tone: 'danger' }); }
   };
 
   const poTotal = (po: PurchaseOrder) => po.items.reduce((acc, i) => acc + i.orderedQty * i.unitPrice, 0);
@@ -1161,7 +1166,7 @@ function PurchaseOrders() {
                 {selected.status !== 'received' && selected.status !== 'cancelled' && (
                   <button className="btn-outline" style={{ fontSize: '12px', padding: '7px 14px', color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => wf.updatePurchaseOrder(selected.id, { status: 'cancelled' })}>Cancel</button>
                 )}
-                <button style={{ color: 'var(--danger)', padding: '7px' }} onClick={() => { if (confirm('Delete this PO?')) { void wf.deletePurchaseOrder(selected.id); setSelectedId(null); } }}>
+                <button style={{ color: 'var(--danger)', padding: '7px' }} onClick={async () => { if (await confirmDialog({ title: 'Delete purchase order?', message: 'Delete this PO?', confirmText: 'Delete', tone: 'danger' })) { void wf.deletePurchaseOrder(selected.id); setSelectedId(null); } }}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -1292,15 +1297,15 @@ function StockCounts() {
       setNewName(''); setNewNotes('');
       setShowCreate(false);
       setSelectedId(sc.id);
-    } catch (e) { alert(e instanceof Error ? e.message : 'Create failed'); }
+    } catch (e) { void alertDialog({ title: 'Create failed', message: e instanceof Error ? e.message : 'Create failed', tone: 'danger' }); }
   };
 
   const handleApply = async (sc: StockCount) => {
     const counted = sc.items.filter(i => i.countedQuantity !== null);
-    if (counted.length === 0) { alert('Enter actual quantities before applying.'); return; }
-    if (!confirm(`Apply count to inventory? ${counted.length} item(s) will be reconciled.`)) return;
+    if (counted.length === 0) { void alertDialog({ title: 'Nothing to apply', message: 'Enter actual quantities before applying.', tone: 'danger' }); return; }
+    if (!await confirmDialog({ title: 'Apply count?', message: `Apply count to inventory? ${counted.length} item(s) will be reconciled.`, confirmText: 'Apply', tone: 'danger' })) return;
     try { await wf.applyStockCount(sc.id); }
-    catch (e) { alert(e instanceof Error ? e.message : 'Apply failed'); }
+    catch (e) { void alertDialog({ title: 'Apply failed', message: e instanceof Error ? e.message : 'Apply failed', tone: 'danger' }); }
   };
 
   const addAllItems = async (sc: StockCount) => {
@@ -1369,7 +1374,7 @@ function StockCounts() {
                 {selected.status === 'in_progress' && (
                   <button className="btn-primary" style={{ fontSize: '12px', padding: '7px 14px', background: '#22c55e' }} onClick={() => handleApply(selected)}><Check size={13} /> Apply to Inventory</button>
                 )}
-                <button style={{ color: 'var(--danger)', padding: '7px' }} onClick={() => { if (confirm('Delete this stock count?')) { void wf.deleteStockCount(selected.id); setSelectedId(null); } }}>
+                <button style={{ color: 'var(--danger)', padding: '7px' }} onClick={async () => { if (await confirmDialog({ title: 'Delete stock count?', message: 'Delete this stock count?', confirmText: 'Delete', tone: 'danger' })) { void wf.deleteStockCount(selected.id); setSelectedId(null); } }}>
                   <Trash2 size={16} />
                 </button>
               </div>

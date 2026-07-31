@@ -6,6 +6,7 @@ import {
 import { apiGet } from '../../lib/api';
 import { useDebounce } from '../../lib/useDebounce';
 import { getPlan } from '../../plans';
+import { alertDialog } from '../../components/ConfirmDialog';
 
 interface TeamRow {
   id: string;
@@ -139,7 +140,7 @@ export default function AdminTeams() {
       const data = await apiGet<TeamDetail>(`/api/admin/teams/${id}`);
       setDetail(data);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to load team');
+      void alertDialog({ title: 'Load failed', message: e instanceof Error ? e.message : 'Failed to load team', tone: 'danger' });
     } finally {
       setDetailLoading(false);
     }

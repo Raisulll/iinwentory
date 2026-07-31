@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api';
 import { PLANS, getPlan, type PlanId } from '../../plans';
+import { confirmDialog, alertDialog } from '../../components/ConfirmDialog';
 
 interface Health {
   db: { ok: boolean; latencyMs: number };
@@ -72,7 +73,7 @@ export default function AdminSystem() {
       setNewMsg('');
       setReloadKey(k => k + 1);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to create');
+      void alertDialog({ title: 'Failed to create', message: e instanceof Error ? e.message : 'Failed to create', tone: 'danger' });
     } finally {
       setCreating(false);
     }
@@ -84,7 +85,7 @@ export default function AdminSystem() {
       await apiPatch(`/api/admin/announcements/${a.id}`, { active: !a.active });
       setAnns(prev => prev.map(x => (x.id === a.id ? { ...x, active: !x.active } : x)));
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to update');
+      void alertDialog({ title: 'Update failed', message: e instanceof Error ? e.message : 'Failed to update', tone: 'danger' });
     } finally {
       setBusyId(null);
     }
@@ -94,22 +95,22 @@ export default function AdminSystem() {
     setRunningJob(true);
     try {
       const r = await apiPost<{ teamsScanned: number; teamsWithLowStock: number; emailsSent: number }>('/api/admin/jobs/low-stock-alerts');
-      alert(`Low-stock alert job complete.\n\nTeams scanned: ${r.teamsScanned}\nTeams with low stock: ${r.teamsWithLowStock}\nEmails sent: ${r.emailsSent}`);
+      void alertDialog({ title: 'Low-stock job complete', message: `Low-stock alert job complete.\n\nTeams scanned: ${r.teamsScanned}\nTeams with low stock: ${r.teamsWithLowStock}\nEmails sent: ${r.emailsSent}`, tone: 'success' });
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Job failed');
+      void alertDialog({ title: 'Job failed', message: e instanceof Error ? e.message : 'Job failed', tone: 'danger' });
     } finally {
       setRunningJob(false);
     }
   };
 
   const removeAnn = async (a: AnnouncementRow) => {
-    if (!confirm('Delete this announcement?')) return;
+    if (!await confirmDialog({ title: 'Delete announcement', message: 'Delete this announcement?', confirmText: 'Delete', tone: 'danger' })) return;
     setBusyId(a.id);
     try {
       await apiDelete(`/api/admin/announcements/${a.id}`);
       setAnns(prev => prev.filter(x => x.id !== a.id));
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to delete');
+      void alertDialog({ title: 'Delete failed', message: e instanceof Error ? e.message : 'Failed to delete', tone: 'danger' });
     } finally {
       setBusyId(null);
     }

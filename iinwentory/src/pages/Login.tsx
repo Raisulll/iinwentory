@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation, type Location } from 'react-router-dom';
 import { useAuth } from '../store/useAuthStore';
 import { apiPost } from '../lib/api';
+import { captureOfferFromUrl } from '../lib/offer';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import { getPlan, PLANS, type PlanId } from '../plans';
 import {
@@ -16,6 +17,7 @@ type LoginMode = 'login' | 'register' | 'forgot' | 'reset';
 export default function Login() {
   const { login, loginWithGoogle, register, isLoggedIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
 
   const isRegister = params.get('register') === '1';
@@ -46,6 +48,11 @@ export default function Login() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
 
+  // Persist any ?offer=<slug> that a protected deep-link (e.g. the billing
+  // offer email → /settings?tab=billing&offer=… → redirected here) forwarded on
+  // the URL, so it survives login and the register → onboarding → checkout path.
+  useEffect(() => { captureOfferFromUrl(); }, []);
+
   useEffect(() => {
     if (!isLoggedIn || mode === 'reset') return;
     // Fresh registrations always go through onboarding (collects company,
@@ -58,8 +65,14 @@ export default function Login() {
       }
       return;
     }
-    navigate('/dashboard', { replace: true });
-  }, [isLoggedIn, mode, navigate, planId, inviteCode]);
+    // Return the user to wherever they were headed before ProtectedRoute
+    // bounced them here (e.g. the billing offer deep-link), else the dashboard.
+    const from = (location.state as { from?: Location } | null)?.from;
+    const dest = from && from.pathname !== '/login'
+      ? `${from.pathname}${from.search}`
+      : '/dashboard';
+    navigate(dest, { replace: true });
+  }, [isLoggedIn, mode, navigate, planId, inviteCode, location.state]);
 
   function switchMode(next: LoginMode) {
     setMode(next);

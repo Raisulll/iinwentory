@@ -40,10 +40,13 @@ export async function createCheckoutSession(
   customerId: string,
   priceId: string,
   teamId: string,
-  opts: { couponId?: string; offerSlug?: string } = {},
+  opts: { couponId?: string; offerSlug?: string; baseUrl?: string } = {},
 ): Promise<string | null> {
   if (!stripe) return null;
-  const frontendUrl = getFrontendBaseUrl();
+  // Return the user to whichever frontend started checkout (passed in from the
+  // validated request Origin). Falls back to FRONTEND_URL for callers that
+  // don't supply one (e.g. server-initiated flows).
+  const frontendUrl = opts.baseUrl || getFrontendBaseUrl();
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
@@ -180,9 +183,9 @@ export async function customerHasEverSubscribed(customerId: string): Promise<boo
   return subs.data.length > 0;
 }
 
-export async function createPortalSession(customerId: string): Promise<string | null> {
+export async function createPortalSession(customerId: string, baseUrl?: string): Promise<string | null> {
   if (!stripe) return null;
-  const frontendUrl = getFrontendBaseUrl();
+  const frontendUrl = baseUrl || getFrontendBaseUrl();
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
     return_url: `${frontendUrl}/settings`,

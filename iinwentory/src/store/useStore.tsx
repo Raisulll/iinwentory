@@ -9,6 +9,7 @@ import { getBootstrap, refetchBootstrap } from '../lib/bootstrap';
 import { subscribeTeamChanges } from '../lib/realtime';
 import { itemInventoryValue } from '../lib/itemValue';
 import { searchItems as searchItemsList, tagNameMap } from '../lib/itemSearch';
+import { alertDialog } from '../components/ConfirmDialog';
 
 interface StoreContextType {
   items: InventoryItem[];
@@ -266,7 +267,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return item;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to add item';
-      alert(msg);
+      void alertDialog({ title: 'Something went wrong', message: msg, tone: 'danger' });
       return null;
     }
   }, []);

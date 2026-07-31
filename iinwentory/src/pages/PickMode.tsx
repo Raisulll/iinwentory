@@ -10,6 +10,7 @@ import {
   ChevronRight, Lock, CheckCircle2,
 } from 'lucide-react';
 import HelpButton from '../components/HelpButton';
+import { confirmDialog, alertDialog } from '../components/ConfirmDialog';
 
 const ISSUE_LABELS: Record<PickIssueType, string> = {
   damaged_stock: 'Damaged stock',
@@ -107,7 +108,7 @@ export default function PickMode() {
 
   const handleComplete = async () => {
     if (!active) return;
-    if (!confirm('Complete this pick list?')) return;
+    if (!await confirmDialog({ title: 'Complete pick list?', message: 'Completing marks this list done and it becomes read-only.', confirmText: 'Complete', tone: 'danger' })) return;
     setWorking(true);
     try {
       await wf.completePickList(active.id);
@@ -207,7 +208,7 @@ export default function PickMode() {
               await wf.reportIssue(active.id, issueModalFor.plItemId, body);
               setIssueModalFor(null);
             } catch (e) {
-              alert(e instanceof Error ? e.message : 'Report failed');
+              void alertDialog({ title: 'Report failed', message: e instanceof Error ? e.message : 'Report failed', tone: 'danger' });
             }
           }}
         />

@@ -10,6 +10,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import Layout from './components/Layout';
 import LoadingShell from './components/LoadingShell';
+import { ConfirmDialogHost } from './components/ConfirmDialog';
 import Login from './pages/Login';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -44,6 +45,7 @@ function App() {
             <TeamProvider>
               <StoreProvider>
                 <WorkflowProvider>
+                <ConfirmDialogHost />
                 <Suspense fallback={<LoadingShell />}>
                 <Routes>
                   {/* Public marketing landing page (ported from the old Nuxt site) */}

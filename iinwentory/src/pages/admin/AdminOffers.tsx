@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Loader2, AlertTriangle, TicketPercent, Plus, Pencil, Trash2, X, Link2, Check, Mail, Send, Users,
+  Globe, Sparkles, Star, Layers,
 } from 'lucide-react';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api';
+import { confirmDialog, alertDialog } from '../../components/ConfirmDialog';
 
 const ALL_PLANS = ['free', 'advanced', 'premium', 'enterprise'] as const;
 
@@ -71,20 +73,20 @@ export default function AdminOffers() {
       await apiPatch(`/api/admin/offers/${o.slug}`, { active: !o.active });
       reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to update offer');
+      void alertDialog({ title: 'Update failed', message: e instanceof Error ? e.message : 'Failed to update offer', tone: 'danger' });
     } finally {
       setBusySlug(null);
     }
   };
 
   const remove = async (o: Offer) => {
-    if (!confirm(`Delete offer "${o.slug}"? Existing Stripe redemptions are unaffected; the code just stops working.`)) return;
+    if (!await confirmDialog({ title: 'Delete offer', message: `Delete offer "${o.slug}"? Existing Stripe redemptions are unaffected; the code just stops working.`, confirmText: 'Delete offer', tone: 'danger' })) return;
     setBusySlug(o.slug);
     try {
       await apiDelete(`/api/admin/offers/${o.slug}`);
       reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to delete offer');
+      void alertDialog({ title: 'Delete failed', message: e instanceof Error ? e.message : 'Failed to delete offer', tone: 'danger' });
     } finally {
       setBusySlug(null);
     }
@@ -462,19 +464,26 @@ function OfferModal({ offer, onClose, onSaved }: { offer: Offer | null; onClose:
 }
 
 type Audience = 'new_users' | 'existing_subscribers' | 'plan' | 'everyone';
+type Scope = 'all_users' | 'team_owners';
 interface PreviewResult { count: number; capped: boolean; sendCap: number; sample: string[] }
 interface SendResult { matched: number; sent: number; failed: number; capped: boolean }
 
-const AUDIENCE_LABELS: { key: Audience; label: string; hint: string }[] = [
-  { key: 'new_users', label: 'New / never-subscribed users', hint: 'Free plan, no Stripe history' },
-  { key: 'existing_subscribers', label: 'Existing / past subscribers', hint: 'Currently or previously on a paid plan' },
-  { key: 'plan', label: 'By plan tier', hint: 'Everyone on a specific plan' },
-  { key: 'everyone', label: 'Everyone', hint: 'All account owners' },
+const AUDIENCE_LABELS: { key: Audience; label: string; hint: string; icon: typeof Users }[] = [
+  { key: 'everyone', label: 'Everyone', hint: 'No segmentation — the widest reach', icon: Globe },
+  { key: 'new_users', label: 'New / never-subscribed', hint: 'Free plan, no Stripe history', icon: Sparkles },
+  { key: 'existing_subscribers', label: 'Existing / past subscribers', hint: 'Currently or previously on a paid plan', icon: Star },
+  { key: 'plan', label: 'By plan tier', hint: 'People on a specific plan', icon: Layers },
+];
+
+const SCOPE_OPTIONS: { key: Scope; label: string; hint: string }[] = [
+  { key: 'all_users', label: 'Every individual user', hint: 'All members — a 5-person team gets 5 emails' },
+  { key: 'team_owners', label: 'One contact per team', hint: 'Just the account owner — a 5-person team gets 1 email' },
 ];
 
 // Compose + send a promo-code campaign email to a targeted audience.
 function CampaignModal({ offer, onClose }: { offer: Offer; onClose: () => void }) {
-  const [audience, setAudience] = useState<Audience>('new_users');
+  const [audience, setAudience] = useState<Audience>('everyone');
+  const [scope, setScope] = useState<Scope>('all_users');
   const [plan, setPlan] = useState<string>('advanced');
   const [signupFrom, setSignupFrom] = useState('');
   const [signupTo, setSignupTo] = useState('');
@@ -485,6 +494,7 @@ function CampaignModal({ offer, onClose }: { offer: Offer; onClose: () => void }
 
   const buildBody = () => ({
     audience,
+    scope,
     ...(audience === 'plan' ? { plan } : {}),
     ...(signupFrom ? { signupFrom: new Date(signupFrom).toISOString() } : {}),
     ...(signupTo ? { signupTo: new Date(signupTo).toISOString() } : {}),
@@ -504,7 +514,7 @@ function CampaignModal({ offer, onClose }: { offer: Offer; onClose: () => void }
 
   const doSend = async () => {
     const n = preview?.count ?? 0;
-    if (!confirm(`Send offer "${offer.slug.toUpperCase()}" to ${n} recipient${n === 1 ? '' : 's'}? This emails them the promo code.`)) return;
+    if (!await confirmDialog({ title: 'Send offer', message: `Send offer "${offer.slug.toUpperCase()}" to ${n} recipient${n === 1 ? '' : 's'}? This emails them the promo code.`, confirmText: 'Send emails' })) return;
     setBusy('send'); setErr('');
     try {
       const r = await apiPost<SendResult>(`/api/admin/offers/${offer.slug}/send`, buildBody());
@@ -513,7 +523,15 @@ function CampaignModal({ offer, onClose }: { offer: Offer; onClose: () => void }
     finally { setBusy(null); }
   };
 
-  const radioRow: React.CSSProperties = { display: 'flex', alignItems: 'flex-start', gap: '9px', padding: '9px 0', cursor: 'pointer' };
+  const sectionLabel: React.CSSProperties = { display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '7px' };
+  // Selectable card used for both the recipient-scope and audience pickers.
+  const optionCard = (active: boolean): React.CSSProperties => ({
+    textAlign: 'left', padding: '11px 12px', borderRadius: '10px', cursor: 'pointer',
+    border: `1.5px solid ${active ? 'var(--primary)' : 'var(--border-color)'}`,
+    background: active ? 'var(--primary-light)' : 'var(--card-bg)',
+    transition: 'border-color 0.15s, background 0.15s',
+    flex: 1,
+  });
 
   return (
     <div className="modal-overlay" onClick={() => !busy && onClose()}>
@@ -524,22 +542,43 @@ function CampaignModal({ offer, onClose }: { offer: Offer; onClose: () => void }
           </h2>
           <button onClick={onClose} className="user-logout" title="Close" style={{ width: 30, height: 30 }}><X size={16} /></button>
         </div>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-          Email the code <code style={{ color: 'var(--primary)', fontWeight: 700 }}>{offer.slug.toUpperCase()}</code> to a targeted group. We email one address per team (the owner), skip anyone who unsubscribed, and never email the same person this offer twice.
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '18px' }}>
+          Email the code <code style={{ color: 'var(--primary)', fontWeight: 700 }}>{offer.slug.toUpperCase()}</code> to your users. We always skip anyone who unsubscribed and never email the same person this offer twice.
         </p>
 
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Audience</label>
-        <div style={{ marginBottom: '14px' }}>
-          {AUDIENCE_LABELS.map(a => (
-            <label key={a.key} style={radioRow}>
-              <input type="radio" name="audience" checked={audience === a.key}
-                onChange={() => { setAudience(a.key); resetPreview(); }} style={{ marginTop: '2px' }} />
-              <span>
-                <span style={{ fontSize: '13.5px', fontWeight: 600 }}>{a.label}</span>
-                <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)' }}>{a.hint}</span>
-              </span>
-            </label>
-          ))}
+        <label style={sectionLabel}>Recipients</label>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '18px' }}>
+          {SCOPE_OPTIONS.map(s => {
+            const active = scope === s.key;
+            return (
+              <button key={s.key} type="button" onClick={() => { setScope(s.key); resetPreview(); }} style={optionCard(active)}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  {active
+                    ? <Check size={15} color="var(--primary)" strokeWidth={3} />
+                    : <span style={{ width: 15, height: 15, borderRadius: '50%', border: '1.5px solid var(--border-strong)', display: 'inline-block' }} />}
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: active ? 'var(--primary)' : 'var(--text-dark)' }}>{s.label}</span>
+                </span>
+                <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.4 }}>{s.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <label style={sectionLabel}>Audience</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+          {AUDIENCE_LABELS.map(a => {
+            const A = a.icon;
+            const active = audience === a.key;
+            return (
+              <button key={a.key} type="button" onClick={() => { setAudience(a.key); resetPreview(); }} style={optionCard(active)}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <A size={15} color={active ? 'var(--primary)' : 'var(--text-muted)'} />
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: active ? 'var(--primary)' : 'var(--text-dark)' }}>{a.label}</span>
+                </span>
+                <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.4 }}>{a.hint}</span>
+              </button>
+            );
+          })}
         </div>
 
         {audience === 'plan' && (
@@ -582,6 +621,17 @@ function CampaignModal({ offer, onClose }: { offer: Offer; onClose: () => void }
                 No one matches (or all matches were already emailed this offer).
               </div>
             )}
+          </div>
+        )}
+
+        {busy === 'send' && (
+          <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: '8px', padding: '11px 14px', marginBottom: '14px', fontSize: '13px', color: 'var(--primary)' }}>
+            <div style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <Loader2 size={14} className="spin" /> Sending {preview?.count ? `to ${preview.count} recipient${preview.count === 1 ? '' : 's'}` : 'emails'}…
+            </div>
+            <div style={{ marginTop: '4px', color: 'var(--text-muted)' }}>
+              Emails go out one at a time, so this can take a moment for large audiences. Please keep this window open.
+            </div>
           </div>
         )}
 

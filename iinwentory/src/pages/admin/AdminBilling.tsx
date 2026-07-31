@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost } from '../../lib/api';
 import { getPlan, type PlanId } from '../../plans';
+import { confirmDialog, alertDialog } from '../../components/ConfirmDialog';
 
 interface BillingRow {
   teamId: string;
@@ -95,16 +96,19 @@ export default function AdminBilling() {
   }, [buildQuery, reloadKey]);
 
   const reconcile = async (row: BillingRow) => {
-    if (!confirm(
-      `Reconcile "${row.teamName}" to the web plan "${getPlan(row.billingPlan).name}"?\n\n` +
-      `This sets the mobile value (teams.plan = ${row.teamsPlan}) to match the web/Stripe value (${row.billingPlan}).`,
-    )) return;
+    if (!await confirmDialog({
+      title: 'Reconcile plan',
+      message:
+        `Reconcile "${row.teamName}" to the web plan "${getPlan(row.billingPlan).name}"?\n\n` +
+        `This sets the mobile value (teams.plan = ${row.teamsPlan}) to match the web/Stripe value (${row.billingPlan}).`,
+      confirmText: 'Reconcile',
+    })) return;
     setBusyId(row.teamId);
     try {
       await apiPost(`/api/admin/teams/${row.teamId}/reconcile`, { source: 'billing' });
       setReloadKey(k => k + 1);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Reconcile failed');
+      void alertDialog({ title: 'Reconcile failed', message: e instanceof Error ? e.message : 'Reconcile failed', tone: 'danger' });
     } finally {
       setBusyId(null);
     }

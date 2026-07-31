@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost, apiDelete } from '../../lib/api';
 import { useDebounce } from '../../lib/useDebounce';
+import { confirmDialog, alertDialog } from '../../components/ConfirmDialog';
 
 interface UserRow {
   id: string;
@@ -127,17 +128,17 @@ export default function AdminUsers() {
 
   const sendReset = async (u: UserRow) => {
     if (!u.email) return;
-    if (!confirm(`Send a password-reset email to ${u.email}?`)) return;
+    if (!await confirmDialog({ title: 'Send reset email', message: `Send a password-reset email to ${u.email}?`, confirmText: 'Send' })) return;
     setBusyId(u.id);
     try {
       const r = await apiPost<{ ok: boolean; emailed: boolean }>(`/api/admin/users/${u.id}/send-password-reset`);
       if (r.emailed) {
-        alert(`Reset email sent to ${u.email}.`);
+        void alertDialog({ title: 'Reset email sent', message: `Reset email sent to ${u.email}.`, tone: 'success' });
       } else {
-        alert(`Reset link was generated, but the email could NOT be delivered.\n\nLikely cause: SMTP isn't configured on this server, or the Resend domain isn't verified yet (so only your own Resend address can receive mail). Verify the domain to email any user.`);
+        void alertDialog({ title: 'Email not delivered', message: `Reset link was generated, but the email could NOT be delivered.\n\nLikely cause: SMTP isn't configured on this server, or the Resend domain isn't verified yet (so only your own Resend address can receive mail). Verify the domain to email any user.` });
       }
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to send reset');
+      void alertDialog({ title: 'Reset failed', message: e instanceof Error ? e.message : 'Failed to send reset', tone: 'danger' });
     } finally {
       setBusyId(null);
     }
@@ -147,10 +148,10 @@ export default function AdminUsers() {
     setBusyId(u.id);
     try {
       const r = await apiPost<{ created: boolean }>(`/api/admin/users/${u.id}/ensure-team`);
-      alert(r.created ? 'Personal team created.' : 'User already had a team.');
+      void alertDialog({ title: r.created ? 'Team created' : 'Team exists', message: r.created ? 'Personal team created.' : 'User already had a team.', tone: 'success' });
       setReloadKey(k => k + 1);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to fix team');
+      void alertDialog({ title: 'Fix team failed', message: e instanceof Error ? e.message : 'Failed to fix team', tone: 'danger' });
     } finally {
       setBusyId(null);
     }
@@ -170,7 +171,7 @@ export default function AdminUsers() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Export failed');
+      void alertDialog({ title: 'Export failed', message: e instanceof Error ? e.message : 'Export failed', tone: 'danger' });
     } finally {
       setBusyId(null);
     }
@@ -178,13 +179,13 @@ export default function AdminUsers() {
 
   const deleteUser = async (u: UserRow) => {
     if (u.isSuperAdmin) return;
-    if (!confirm(`PERMANENTLY delete ${u.email ?? u.id}?\n\nThis removes their account${u.teamRole === 'owner' ? ' and their personal team (if they are the sole member)' : ''}. This cannot be undone.`)) return;
+    if (!await confirmDialog({ title: 'Delete user', message: `PERMANENTLY delete ${u.email ?? u.id}?\n\nThis removes their account${u.teamRole === 'owner' ? ' and their personal team (if they are the sole member)' : ''}. This cannot be undone.`, confirmText: 'Delete', tone: 'danger' })) return;
     setBusyId(u.id);
     try {
       await apiDelete(`/api/admin/users/${u.id}`);
       setItems(prev => prev.filter(x => x.id !== u.id));
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Delete failed');
+      void alertDialog({ title: 'Delete failed', message: e instanceof Error ? e.message : 'Delete failed', tone: 'danger' });
     } finally {
       setBusyId(null);
     }

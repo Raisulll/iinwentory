@@ -159,7 +159,11 @@ export async function sendOfferEmail(
 ): Promise<boolean> {
   const { slug, description, discountLabel, unsubscribeUrl } = opts;
   const code = slug.toUpperCase();
-  const applyUrl = `${frontendUrl()}/?offer=${encodeURIComponent(slug)}`;
+  // Deep-link straight to the billing page with the offer pre-applied. Campaign
+  // recipients already have accounts, so this lands logged-in users on the
+  // discount immediately; logged-out users are bounced to /login and returned
+  // here (offer intact) once they authenticate. See ProtectedRoute + Login.
+  const applyUrl = `${frontendUrl()}/settings?tab=billing&offer=${encodeURIComponent(slug)}`;
   return sendMail(email, `${discountLabel} on iinwentory`, renderLayout({
     heading: `${discountLabel} — just for you`,
     bodyHtml: `

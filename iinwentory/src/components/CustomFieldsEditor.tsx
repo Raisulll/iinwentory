@@ -7,6 +7,7 @@ import {
   FIELD_TYPES, FIELD_TYPE_LABELS,
   type CustomField, type CustomFieldType,
 } from '../lib/customFields';
+import { alertDialog } from './ConfirmDialog';
 
 const TYPE_ICON: Record<CustomFieldType, typeof TypeIcon> = {
   small_text: TypeIcon,
@@ -50,7 +51,7 @@ export default function CustomFieldsEditor({ fields, onChange, max }: Props) {
   const confirmAdd = () => {
     if (!namingType || !newName.trim()) return;
     if (fields.some(f => f.key.toLowerCase() === newName.trim().toLowerCase())) {
-      alert('A field with that name already exists.');
+      void alertDialog({ title: 'Duplicate field', message: 'A field with that name already exists.', tone: 'danger' });
       return;
     }
     const initial: CustomField = {
